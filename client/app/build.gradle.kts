@@ -22,6 +22,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            isDebuggable = true
+
+            buildConfigField("String", "API_BASE_URL", "\"https://dev-api.yourbackend.com/\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -39,11 +44,11 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
-    val room_version = "2.8.2"
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -56,6 +61,7 @@ dependencies {
     implementation(libs.firebase.ml.modeldownloader)
     implementation(libs.tensorflow.lite)
     implementation(libs.retrofit)
+    implementation(libs.converter.kotlinx.serialization)
     implementation(platform(libs.okhttp.bom))
     implementation(libs.okhttp)
     implementation(libs.logging.interceptor)
@@ -67,9 +73,9 @@ dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.androidx.navigation.compose)
-    ksp("androidx.room:room-compiler:$room_version")
-    implementation("androidx.room:room-runtime:${room_version}")
-    implementation("androidx.room:room-ktx:${room_version}")
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
