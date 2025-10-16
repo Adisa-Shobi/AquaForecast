@@ -1,10 +1,12 @@
 [versions]
 agp = "8.12.3"
+converterKotlinxSerialization = "3.0.0"
 datastorePreferences = "1.1.7"
 firebaseBom = "34.4.0"
 kotlin = "2.2.20"
 leakcanaryAndroid = "2.14"
 navigationCompose = "2.9.5"
+roomCompiler = "2.8.2"
 vico = "2.2.0"
 coreKtx = "1.10.1"
 junit = "4.13.2"
@@ -17,11 +19,15 @@ lifecycleRuntimeKtx = "2.6.1"
 activityCompose = "1.8.0"
 composeBom = "2024.09.00"
 okhttpBom = "5.2.1"
-retrofit = "2.9.0"
+retrofit = "3.0.0"
 tensorflowLite = "2.3.0"
 workRuntimeKtx = "2.10.5"
 
 [libraries]
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomCompiler" }
+androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomCompiler" }
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomCompiler" }
+converter-kotlinx-serialization = { module = "com.squareup.retrofit2:converter-kotlinx-serialization", version.ref = "converterKotlinxSerialization" }
 koin-android = { module = "io.insert-koin:koin-android" }
 koin-bom = { module = "io.insert-koin:koin-bom", version.ref = "koin-bom" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
