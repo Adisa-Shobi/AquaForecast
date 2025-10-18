@@ -15,7 +15,7 @@ class MainApplication: Application() {
         super.onCreate()
 
         startKoin {
-            androidLogger(if (BuildConfig.DEBUG) Level.ERROR else Level.NONE)
+            androidLogger(if (BuildConfig.DEBUG) Level.DEBUG else Level.NONE)
             androidContext(this@MainApplication)
             // Load modules
             modules(listOf(
