@@ -60,22 +60,38 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.firebase.ml.modeldownloader)
     implementation(libs.tensorflow.lite)
+    // Retrofit
     implementation(libs.retrofit)
     implementation(libs.converter.kotlinx.serialization)
     implementation(platform(libs.okhttp.bom))
     implementation(libs.okhttp)
     implementation(libs.logging.interceptor)
     implementation(libs.kotlinx.coroutines.android)
+    /// Vico
     implementation(libs.vico.compose)
     implementation(libs.vico.compose.m3)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.datastore.preferences)
+    // Koin DI
     implementation(platform(libs.koin.bom))
+    implementation(libs.koin.core)
+    implementation(libs.koin.androidx.compose)
+    implementation(libs.koin.androidx.compose.navigation)
     implementation(libs.koin.android)
+    // Navigation
     implementation(libs.androidx.navigation.compose)
+    // Icons
+    implementation(libs.androidx.material.icons.extended)
+    // Firebase auth
+    implementation(libs.google.firebase.auth)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+    // Room DB
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    // Junit
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -84,6 +100,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     debugImplementation(libs.leakcanary.android)
+    // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.auth)

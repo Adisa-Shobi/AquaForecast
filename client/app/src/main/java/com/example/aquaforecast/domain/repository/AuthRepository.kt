@@ -1,54 +1,53 @@
 package com.example.aquaforecast.domain.repository
 
+import android.content.Context
+import com.example.aquaforecast.domain.model.User
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Repository interface for Firebase authentication
+ * Supports email/password and Google Sign-In
+ */
 interface AuthRepository {
 
     /**
-     * Save user's phone number for authentication
-     * Phone number serves as the primary user identifier
-     *
-     * @param phone The phone number to save (should be validated before calling)
-     * @return Result.Success with Unit if saved successfully,
-     *         Result.Error with message if save failed
+     * Login with email and password
      */
-    suspend fun savePhone(phone: String): Result<Unit>
+    suspend fun loginWithEmail(email: String, password: String): Result<User>
 
     /**
-     * Retrieve the saved phone number
-     * Used to check authentication status and display user info
-     *
-     * @return Result.Success with phone number or null if not set,
-     *         Result.Error with message if retrieval failed
+     * Register new user with email and password
      */
-    suspend fun getPhone(): Result<String?>
+    suspend fun registerWithEmail(email: String, password: String): Result<User>
 
     /**
-     * Check if user is logged in (has saved phone number)
-     * Used to determine app entry point (login vs dashboard)
-     *
-     * @return Result.Success with true if logged in (phone exists), false otherwise,
-     *         Result.Error with message if check failed
+     * Login with Google ID token
+     */
+    suspend fun signInWithGoogle(context: Context): Result<User>
+
+    /**
+     * Get current authenticated user
+     */
+    suspend fun getCurrentUser(): Result<User?>
+
+    /**
+     * Observe authentication state changes
+     */
+    fun observeAuthState(): Flow<User?>
+
+    /**
+     * Check if user is logged in
      */
     suspend fun isLoggedIn(): Result<Boolean>
 
     /**
-     * Logout user by clearing saved phone number and preferences
-     * This removes all user data from local storage
-     *
-     * @return Result.Success with Unit if logout successful,
-     *         Result.Error with message if logout failed
+     * Logout current user
      */
     suspend fun logout(): Result<Unit>
 
     /**
-     * Observe user preferences as a reactive stream
-     * Automatically emits new values when preferences change
-     * Returns map of preference keys to values
-     *
-     * Example preferences: theme, notifications_enabled, last_sync_time
-     *
-     * @return Flow that emits preference map whenever preferences change
+     * Send password reset email
      */
-    fun preferences(): Flow<Map<String, Any>>
+    suspend fun sendPasswordResetEmail(email: String): Result<Unit>
 }
