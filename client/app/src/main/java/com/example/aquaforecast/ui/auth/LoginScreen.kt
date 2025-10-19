@@ -23,6 +23,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 private const val TAG = "LoginScreen"
 
@@ -34,8 +36,9 @@ private const val TAG = "LoginScreen"
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
-    authViewModel: AuthViewModel
 ) {
+
+    val authViewModel: AuthViewModel = koinViewModel()
     val state = authViewModel.state.collectAsState()
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current

@@ -1,7 +1,15 @@
+// domain/repository/PondRepository.kt
 package com.example.aquaforecast.domain.repository
 
 import com.example.aquaforecast.domain.model.Pond
+import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
 
+/**
+ * Repository interface for pond configuration and management
+ * Provides both low-level operations (save, update, delete) and high-level
+ * UI-friendly helper functions for common operations
+ */
 interface PondRepository {
 
     /**
@@ -50,4 +58,62 @@ interface PondRepository {
      *         Result.Error with message if check failed
      */
     suspend fun isConfigured(): Result<Boolean>
+    /**
+     * Save or update pond configuration from UI form data
+     * This is a convenience method that handles both insert and update operations
+     * automatically based on whether a pond already exists
+     *
+     * If a pond already exists, it will be updated with the new values.
+     * If no pond exists, a new one will be created.
+     *
+     * @param pondName The name of the pond (e.g., "Main Pond A")
+     * @param species The species as a string ("Tilapia" or "Catfish")
+     * @param initialStockCount The initial number of fish in the pond
+     * @param startDate The date when the pond was stocked
+     * @return Result.Success with Unit if saved successfully,
+     *         Result.Error with message if save failed (e.g., invalid species)
+     *
+     * @throws IllegalArgumentException if species is not "Tilapia" or "Catfish"
+     */
+    suspend fun savePondConfig(
+        pondName: String,
+        species: String,
+        initialStockCount: Int,
+        startDate: LocalDate
+    ): Result<Unit>
+
+    /**
+     * Get the current pond configuration
+     * Alias for get() with more descriptive name for UI usage
+     *
+     * @return Result.Success with pond configuration or null if not configured,
+     *         Result.Error with message if retrieval failed
+     */
+    suspend fun getPondConfig(): Result<Pond?>
+
+    /**
+     * Observe pond configuration changes in real-time
+     * Returns a Flow that emits the current pond configuration whenever it changes
+     * Useful for reactive UI updates
+     *
+     * Emits:
+     * - null when no pond is configured
+     * - Pond object when configuration exists
+     * - Updated Pond object whenever configuration changes
+     *
+     * @return Flow<Pond?> that emits pond configuration changes
+     */
+    fun observePondConfig(): Flow<Pond?>
+
+    /**
+     * Delete the pond configuration
+     * Alias for delete() with more descriptive name for UI usage
+     *
+     * This is a destructive operation that removes all farm data and predictions.
+     * Consider showing a confirmation dialog before calling this method.
+     *
+     * @return Result.Success with Unit if deleted successfully,
+     *         Result.Error with message if deletion failed
+     */
+    suspend fun deletePondConfig(): Result<Unit>
 }
