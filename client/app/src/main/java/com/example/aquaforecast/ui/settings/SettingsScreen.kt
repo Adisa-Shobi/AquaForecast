@@ -1,6 +1,5 @@
 package com.example.aquaforecast.ui.settings
 
-import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,11 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-
-const val TAG = "SettingsScreen"
 
 /**
  * Settings screen matching HTML design
@@ -177,6 +173,29 @@ fun SettingsScreen(
                         )
                     }
                 }
+                //
+                SectionHeader("Forecast Options")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        FilledTextField(
+                            value = state.forecastHorizon,
+                            onValueChange = viewModel::onForecastHorizonChanged,
+                            placeholder = "Forecast Horizon (days)",
+                            isError = state.forecastHorizonError != null,
+                            errorMessage = state.forecastHorizonError,
+                            enabled = !state.isSaving
+                        )
+                    }}
+
 
                 // Sync Options Section
                 SectionHeader("Sync Options")

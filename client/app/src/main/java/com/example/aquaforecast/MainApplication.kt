@@ -1,7 +1,9 @@
 package com.example.aquaforecast
 
 import android.app.Application
+import com.example.aquaforecast.di.dataStoreModule
 import com.example.aquaforecast.di.databaseModule
+import com.example.aquaforecast.di.mlModule
 import com.example.aquaforecast.di.networkModule
 import com.example.aquaforecast.di.repositoryModule
 import com.example.aquaforecast.di.viewModelModule
@@ -19,9 +21,11 @@ class MainApplication: Application() {
             androidContext(this@MainApplication)
             // Load modules
             modules(listOf(
+                dataStoreModule,
                 databaseModule,
                 networkModule,
                 repositoryModule,
+                mlModule,
                 viewModelModule
             ))
         }

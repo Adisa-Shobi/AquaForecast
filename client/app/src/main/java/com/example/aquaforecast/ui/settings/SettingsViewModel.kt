@@ -3,6 +3,7 @@ package com.example.aquaforecast.ui.settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.aquaforecast.data.preferences.PreferencesManager
 import com.example.aquaforecast.domain.repository.AuthRepository
 import com.example.aquaforecast.domain.repository.PondRepository
 import com.example.aquaforecast.domain.repository.onError
@@ -14,9 +15,11 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 
+private const val TAG = "SettingsViewModel"
 class SettingsViewModel(
     private val pondRepository: PondRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val preferencesManager: PreferencesManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsState())
@@ -24,6 +27,7 @@ class SettingsViewModel(
 
     init {
         loadPondConfig()
+        loadForecastHorizon()
     }
 
     private fun loadPondConfig() {
@@ -42,6 +46,14 @@ class SettingsViewModel(
                         }
                     }
                 }
+        }
+    }
+
+    private fun loadForecastHorizon() {
+        viewModelScope.launch {
+            preferencesManager.forecastHorizon.collect { horizon ->
+                _state.update { it.copy(forecastHorizon = horizon.toString()) }
+            }
         }
     }
 
@@ -69,6 +81,16 @@ class SettingsViewModel(
             it.copy(
                 stockCount = filteredCount,
                 stockCountError = null
+            )
+        }
+    }
+
+    fun onForecastHorizonChanged(days: String) {
+        val filteredDays = days.filter { it.isDigit() }
+        _state.update {
+            it.copy(
+                forecastHorizon = filteredDays,
+                forecastHorizonError = null
             )
         }
     }
@@ -140,15 +162,17 @@ class SettingsViewModel(
         val speciesError = validateSpecies(currentState.species)
         val stockCountError = validateStockCount(currentState.stockCount)
         val startDateError = validateStartDate(currentState.startDate)
+        val forecastHorizonError = validateForecastHorizon(currentState.forecastHorizon)
 
         if (pondNameError != null || speciesError != null ||
-            stockCountError != null || startDateError != null) {
+            stockCountError != null || startDateError != null || forecastHorizonError != null) {
             _state.update {
                 it.copy(
                     pondNameError = pondNameError,
                     speciesError = speciesError,
                     stockCountError = stockCountError,
-                    startDateError = startDateError
+                    startDateError = startDateError,
+                    forecastHorizonError = forecastHorizonError
                 )
             }
             return
@@ -157,12 +181,16 @@ class SettingsViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true, error = null) }
 
+            // Save pond config
             pondRepository.savePondConfig(
                 pondName = currentState.pondName.trim(),
                 species = currentState.species,
                 initialStockCount = currentState.stockCount.toInt(),
                 startDate = currentState.startDate ?: LocalDate.now()
             ).onSuccess {
+                // Save forecast horizon to preferences
+                preferencesManager.setForecastHorizon(currentState.forecastHorizon.toInt())
+
                 _state.update {
                     it.copy(
                         isSaving = false,
@@ -235,6 +263,16 @@ class SettingsViewModel(
             else -> null
         }
     }
+
+    private fun validateForecastHorizon(days: String): String? {
+        return when {
+            days.isBlank() -> "Forecast horizon is required"
+            days.toIntOrNull() == null -> "Invalid forecast horizon"
+            days.toInt() < 1 -> "Forecast horizon must be at least 1 day"
+            days.toInt() > 180 -> "Forecast horizon cannot exceed 180 days"
+            else -> null
+        }
+    }
 }
 
 data class SettingsState(
@@ -242,10 +280,12 @@ data class SettingsState(
     val species: String = "",
     val stockCount: String = "",
     val startDate: LocalDate? = LocalDate.now(),
+    val forecastHorizon: String = "20", // Default: 20 days
     val pondNameError: String? = null,
     val speciesError: String? = null,
     val stockCountError: String? = null,
     val startDateError: String? = null,
+    val forecastHorizonError: String? = null,
     val isSpeciesDropdownExpanded: Boolean = false,
     val showDatePicker: Boolean = false,
     val isOfflineMode: Boolean = false,
