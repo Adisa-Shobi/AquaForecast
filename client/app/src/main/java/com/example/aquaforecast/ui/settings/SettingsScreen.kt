@@ -12,9 +12,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.aquaforecast.ui.components.AppButton
+import com.example.aquaforecast.ui.components.AppCard
+import com.example.aquaforecast.ui.components.SectionHeader
 import org.koin.androidx.compose.koinViewModel
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+private const val TAG = "SettingsScreen"
 
 /**
  * Settings screen matching HTML design
@@ -75,14 +80,11 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 // Pond Details Section
-                SectionHeader("Pond Details")
+                SectionHeader(title = "Pond Details")
 
-                Card(
+                AppCard(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    elevation = 0.dp
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
@@ -174,13 +176,10 @@ fun SettingsScreen(
                     }
                 }
                 //
-                SectionHeader("Forecast Options")
-                Card(
+                SectionHeader(title = "Forecast Options")
+                AppCard(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    elevation = 0.dp
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
@@ -198,14 +197,11 @@ fun SettingsScreen(
 
 
                 // Sync Options Section
-                SectionHeader("Sync Options")
+                SectionHeader(title = "Sync Options")
 
-                Card(
+                AppCard(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    elevation = 0.dp
                 ) {
                     Column {
                         // Sync Data
@@ -264,49 +260,23 @@ fun SettingsScreen(
                 }
 
                 // Account Section
-                SectionHeader("Account")
+                SectionHeader(title = "Account")
 
-                Button(
+                AppButton(
+                    text = "Sign Out",
                     onClick = viewModel::signOut,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Text(
-                        text = "Sign Out",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 // Save button for pond configuration
                 if (state.pondName.isNotBlank() || state.species.isNotBlank() || state.stockCount.isNotBlank()) {
-                    Button(
+                    AppButton(
+                        text = "Save Configuration",
                         onClick = viewModel::savePondConfig,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
                         enabled = !state.isSaving,
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        if (state.isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Text(
-                                text = "Save Configuration",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                        isLoading = state.isSaving,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
 
                 // Error message
@@ -364,18 +334,6 @@ fun SettingsScreen(
     }
 }
 
-/**
- * Section header matching HTML design
- */
-@Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurface
-    )
-}
 
 /**
  * Filled text field matching HTML design
