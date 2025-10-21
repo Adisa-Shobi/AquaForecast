@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.aquaforecast.ui.components.AppButton
 import com.example.aquaforecast.ui.components.AppCard
+import com.example.aquaforecast.ui.components.FilledTextField
 import com.example.aquaforecast.ui.components.SectionHeader
 import org.koin.androidx.compose.koinViewModel
 import java.time.ZoneId
@@ -330,60 +331,6 @@ fun SettingsScreen(
             ) {
                 DatePicker(state = datePickerState)
             }
-        }
-    }
-}
-
-
-/**
- * Filled text field matching HTML design
- */
-@Composable
-private fun FilledTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    modifier: Modifier = Modifier,
-    readOnly: Boolean = false,
-    trailingIcon: @Composable (() -> Unit)? = null,
-    isError: Boolean = false,
-    errorMessage: String? = null,
-    enabled: Boolean = true
-) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        TextField(
-            value = value,
-            onValueChange = onValueChange,
-            placeholder = {
-                Text(
-                    text = placeholder,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
-            },
-            readOnly = readOnly,
-            trailingIcon = trailingIcon,
-            isError = isError,
-            enabled = enabled,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-                errorIndicatorColor = Color.Transparent
-            ),
-            shape = MaterialTheme.shapes.medium,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        if (isError && errorMessage != null) {
-            Text(
-                text = errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-            )
         }
     }
 }

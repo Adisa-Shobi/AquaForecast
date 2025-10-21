@@ -2,6 +2,7 @@ package com.example.aquaforecast.di
 
 import com.example.aquaforecast.ui.auth.AuthViewModel
 import com.example.aquaforecast.ui.dashboard.DashboardViewModel
+import com.example.aquaforecast.ui.dataentry.EntryViewModel
 import com.example.aquaforecast.ui.settings.SettingsViewModel
 import com.example.aquaforecast.ui.splash.SplashViewModel
 import org.koin.core.module.dsl.viewModelOf
@@ -12,4 +13,5 @@ val viewModelModule = module {
     viewModelOf(::SplashViewModel)
     viewModelOf(::SettingsViewModel)
     viewModelOf(::DashboardViewModel)
+    viewModelOf(::EntryViewModel)
 }

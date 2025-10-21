@@ -52,7 +52,9 @@ fun MainScreen() {
                     {selectedTab = DashboardTab.PREDICTIONS},
                     {selectedTab = DashboardTab.SCHEDULE}
                 )
-                DashboardTab.DATA_ENTRY  -> DataEntryScreen()
+                DashboardTab.DATA_ENTRY  -> DataEntryScreen(
+                    onNavigateToSettings = { selectedTab = DashboardTab.SETTINGS }
+                )
                 DashboardTab.PREDICTIONS  -> PredictionsScreen()
                 DashboardTab.SCHEDULE -> ScheduleScreen()
                 DashboardTab.SETTINGS-> SettingsScreen()
