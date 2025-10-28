@@ -13,8 +13,14 @@ Privacy-first REST API for aquaculture water quality data collection and analyti
 ```bash
 cd API
 cp .env.example .env
+# Edit .env and add your remote DATABASE_URL
 # Add your Firebase credentials file: firebase-credentials.json
 docker-compose up -d
+```
+
+**Important**: The API uses a remote PostgreSQL database. Set `DATABASE_URL` in your `.env` file:
+```
+DATABASE_URL=postgresql://user:password@your-db-host.com:5432/aquaforecast
 ```
 
 API available at: http://localhost:8000
@@ -30,16 +36,15 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Setup PostgreSQL
-createdb aquaforecast_dev
-psql aquaforecast_dev -c "CREATE EXTENSION postgis;"
-
 # Configure environment
 cp .env.example .env
-# Edit .env with your settings
+# Edit .env with your remote DATABASE_URL
 
 # Add Firebase credentials
 # Place firebase-credentials.json in API directory
+
+# Ensure PostGIS is enabled on your remote database:
+# Run: CREATE EXTENSION IF NOT EXISTS postgis;
 
 # Run migrations
 alembic upgrade head
@@ -66,7 +71,7 @@ uvicorn app.main:app --reload
 ### Farm Data
 
 **POST /api/v1/farm-data/sync**
-- Bulk sync water quality readings (max 100 per request)
+- Bulk sync water quality readings with fish measurements (max 100 per request)
 - Headers: `Authorization: Bearer <firebase_token>`
 - Body:
 ```json
@@ -80,6 +85,10 @@ uvicorn app.main:app --reload
       "ammonia": 0.15,
       "nitrate": 10.5,
       "turbidity": 12.3,
+      "fish_weight": 0.850,
+      "fish_length": 25.5,
+      "verified": true,
+      "start_date": "2025-01-01",
       "location": {"latitude": -1.2921, "longitude": 36.8219},
       "country_code": "KE",
       "recorded_at": "2025-01-15T08:00:00Z"
@@ -87,6 +96,7 @@ uvicorn app.main:app --reload
   ]
 }
 ```
+- **Note**: `fish_weight` (kg), `fish_length` (cm), `verified`, and `start_date` are optional
 - Returns: Sync summary with synced_count, failed_count
 
 **GET /api/v1/farm-data**
@@ -160,6 +170,10 @@ CREATE TABLE farm_data (
     ammonia DECIMAL(5, 2) NOT NULL,
     nitrate DECIMAL(5, 2) NOT NULL,
     turbidity DECIMAL(6, 2) NOT NULL,
+    fish_weight DECIMAL(8, 3),
+    fish_length DECIMAL(6, 2),
+    verified BOOLEAN DEFAULT FALSE NOT NULL,
+    start_date DATE,
     location GEOGRAPHY(POINT, 4326) NOT NULL,
     country_code VARCHAR(2),
     recorded_at TIMESTAMP NOT NULL,
@@ -223,12 +237,14 @@ Client Response
 
 ### Environment Variables (.env)
 
+**IMPORTANT**: Create a `.env` file (never commit to git) with your secrets:
+
 ```bash
 # Environment
 ENVIRONMENT=development
 
-# Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/aquaforecast_dev
+# Database (Remote - KEEP SECRET!)
+DATABASE_URL=postgresql://user:password@your-db-host.com:5432/aquaforecast
 
 # Firebase
 FIREBASE_CREDENTIALS_PATH=./firebase-credentials.json
@@ -265,29 +281,6 @@ All protected endpoints require Firebase ID token in Authorization header:
 Authorization: Bearer <firebase_id_token>
 ```
 
-### Getting a Token (for testing)
-
-From Android app:
-```kotlin
-FirebaseAuth.getInstance().currentUser?.getIdToken(true)
-    ?.addOnSuccessListener { result ->
-        val token = result.token
-        // Use token in API requests
-    }
-```
-
-Via Firebase REST API:
-```bash
-curl -X POST \
-  'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=YOUR_API_KEY' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "email": "user@example.com",
-    "password": "password",
-    "returnSecureToken": true
-  }'
-```
-
 ## Data Validation
 
 ### Water Quality Parameters
@@ -297,6 +290,12 @@ curl -X POST \
 - **ammonia**: 0-10 mg/L (2 decimal places)
 - **nitrate**: 0-100 mg/L (2 decimal places)
 - **turbidity**: 0-1000 NTU (2 decimal places)
+
+### Fish Measurements (Optional)
+- **fish_weight**: 0-100 kg (3 decimal places, e.g., 0.850)
+- **fish_length**: 0-500 cm (2 decimal places, e.g., 25.50)
+- **verified**: boolean (true/false) - indicates user confirmed measurements are accurate
+- **start_date**: Date in YYYY-MM-DD format - pond cycle start date
 
 ### Location Data
 - **latitude**: -90 to 90 (6 decimal places)
@@ -391,14 +390,17 @@ alembic history
 ### Using Docker
 
 ```bash
-# Build image
-docker build -t aquaforecast-api:v1 .
+# Ensure .env file has your remote DATABASE_URL
+# Build and run
+docker-compose up -d
 
-# Run container
+# Or build and run manually:
+docker build -t aquaforecast-api:v1 .
 docker run -d \
   --name aquaforecast-api \
   -p 8000:8000 \
   --env-file .env \
+  -v $(pwd)/firebase-credentials.json:/app/firebase-credentials.json:ro \
   aquaforecast-api:v1
 ```
 
@@ -423,19 +425,7 @@ docker run -d \
 - No sensitive data in logs
 - Database connection pooling
 
-### Privacy Compliance
-**What we store:**
-- ✅ Firebase UID, email, user ID
-- ✅ Water quality parameters
-- ✅ Location coordinates
-
-**What we DON'T store:**
-- ❌ User profile info (name, photo, phone)
-- ❌ Farm/pond configurations
-- ❌ Predictions
-- ❌ Feeding schedules
-
-## Monitoring
+# Monitoring
 
 ### Health Check
 ```bash
@@ -456,10 +446,9 @@ tail -f logs/api.log
 
 ### Database Connection Error
 ```bash
-# Check PostgreSQL is running
-psql -U postgres -c "SELECT 1"
-
-# Verify DATABASE_URL in .env
+# Verify DATABASE_URL in .env points to your remote database
+# Test connection (replace with your DATABASE_URL):
+python -c "import psycopg2; psycopg2.connect('your-database-url'); print('✅ Connected')"
 ```
 
 ### Firebase Authentication Error
@@ -484,7 +473,10 @@ uvicorn app.main:app --port 8001
 
 ### PostGIS Extension Missing
 ```bash
-psql aquaforecast_dev -c "CREATE EXTENSION postgis;"
+# Connect to your remote database and run:
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+# Or use the enable_postgis.py script (if you still have it)
 ```
 
 ## Development

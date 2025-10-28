@@ -1,51 +1,17 @@
 version: '3.8'
 
 services:
-  # PostgreSQL database with PostGIS
-  db:
-    image: postgis/postgis:14-3.3
-    container_name: aquaforecast_db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: aquaforecast_dev
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # FastAPI application
   api:
     build: .
     container_name: aquaforecast_api
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/aquaforecast_dev
-      - FIREBASE_CREDENTIALS_PATH=/app/firebase-credentials.json
-      - ENVIRONMENT=development
-      - API_V1_PREFIX=/api/v1
-      - CORS_ORIGINS=http://localhost:3000
-      - LOG_LEVEL=INFO
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     volumes:
       - ./firebase-credentials.json:/app/firebase-credentials.json:ro
-    depends_on:
-      db:
-        condition: service_healthy
     command: >
       sh -c "
-        echo 'Waiting for database...' &&
-        sleep 5 &&
-        echo 'Running migrations...' &&
         alembic upgrade head &&
-        echo 'Starting server...' &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
       "
-
-volumes:
-  postgres_data:
