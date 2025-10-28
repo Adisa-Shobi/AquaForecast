@@ -1,7 +1,7 @@
 """Farm data model - water quality measurements only."""
 
-from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Numeric, ForeignKey
+from datetime import datetime, date
+from sqlalchemy import Column, String, DateTime, Date, Numeric, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geography
 import uuid
@@ -11,9 +11,9 @@ from app.core.database import Base
 
 class FarmData(Base):
     """
-    Farm data model - stores only water quality parameters.
+    Farm data model - stores water quality parameters and fish measurements.
 
-    Privacy: Only water parameters and location stored (with user consent).
+    Privacy: Only water parameters, location, and fish measurements stored (with user consent).
     No pond configurations or predictions.
     """
 
@@ -29,6 +29,14 @@ class FarmData(Base):
     ammonia = Column(Numeric(5, 2), nullable=False)
     nitrate = Column(Numeric(5, 2), nullable=False)
     turbidity = Column(Numeric(6, 2), nullable=False)
+
+    # Fish measurements
+    fish_weight = Column(Numeric(8, 3), nullable=True, comment="Fish weight in kg")
+    fish_length = Column(Numeric(6, 2), nullable=True, comment="Fish length in cm")
+    verified = Column(Boolean, nullable=False, default=False, comment="User confirmed measurements are accurate")
+
+    # Pond cycle tracking
+    start_date = Column(Date, nullable=True, index=True, comment="When the current pond cycle started")
 
     # Location data for analytics
     location = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
@@ -53,6 +61,10 @@ class FarmData(Base):
             "ammonia": float(self.ammonia),
             "nitrate": float(self.nitrate),
             "turbidity": float(self.turbidity),
+            "fish_weight": float(self.fish_weight) if self.fish_weight else None,
+            "fish_length": float(self.fish_length) if self.fish_length else None,
+            "verified": self.verified,
+            "start_date": self.start_date.isoformat() if self.start_date else None,
             "country_code": self.country_code,
             "recorded_at": self.recorded_at.isoformat() if self.recorded_at else None,
             "synced_at": self.synced_at.isoformat() if self.synced_at else None,

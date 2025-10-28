@@ -1,6 +1,6 @@
 """Farm data schemas for request/response validation."""
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional
 from pydantic import BaseModel, Field, validator
 
@@ -12,13 +12,17 @@ class LocationData(BaseModel):
 
 
 class FarmDataReading(BaseModel):
-    """Single water quality reading."""
-    temperature: float = Field(..., ge=0, le=50)
-    ph: float = Field(..., ge=0, le=14)
-    dissolved_oxygen: float = Field(..., ge=0, le=20)
-    ammonia: float = Field(..., ge=0, le=10)
-    nitrate: float = Field(..., ge=0, le=100)
-    turbidity: float = Field(..., ge=0, le=1000)
+    """Single water quality reading with fish measurements."""
+    temperature: float = Field(..., ge=0, le=50, description="Temperature in °C")
+    ph: float = Field(..., ge=0, le=14, description="pH level")
+    dissolved_oxygen: float = Field(..., ge=0, le=20, description="Dissolved oxygen in mg/L")
+    ammonia: float = Field(..., ge=0, le=10, description="Ammonia in mg/L")
+    nitrate: float = Field(..., ge=0, le=100, description="Nitrate in mg/L")
+    turbidity: float = Field(..., ge=0, le=1000, description="Turbidity in NTU")
+    fish_weight: Optional[float] = Field(None, ge=0, le=100, description="Fish weight in kilograms (kg)")
+    fish_length: Optional[float] = Field(None, ge=0, le=500, description="Fish length in cm")
+    verified: bool = Field(default=False, description="User confirmed fish measurements are accurate")
+    start_date: Optional[str] = Field(None, description="Pond cycle start date (YYYY-MM-DD)")
     location: LocationData
     country_code: Optional[str] = Field(None, min_length=2, max_length=2)
     recorded_at: datetime
@@ -55,6 +59,10 @@ class FarmDataResponse(BaseModel):
     ammonia: float
     nitrate: float
     turbidity: float
+    fish_weight: Optional[float]
+    fish_length: Optional[float]
+    verified: bool
+    start_date: Optional[str]
     country_code: Optional[str]
     recorded_at: datetime
     synced_at: datetime
