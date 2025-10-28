@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, farm_data
+from app.api.v1.endpoints import auth, farm_data, models
 
 # Create main v1 router
 api_router = APIRouter()
@@ -19,4 +19,11 @@ api_router.include_router(
     farm_data.router,
     prefix="/farm-data",
     tags=["Farm Data"],
+)
+
+# Include ML model endpoints
+api_router.include_router(
+    models.router,
+    prefix="/models",
+    tags=["ML Models"],
 )

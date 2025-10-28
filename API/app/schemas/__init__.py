@@ -17,6 +17,10 @@ from app.schemas.farm_data import (
     FarmDataListResponse,
     AnalyticsResponse,
 )
+from app.schemas.model import (
+    ModelVersionResponse,
+    ModelUpdateCheckResponse,
+)
 
 __all__ = [
     "UserCreate",
@@ -30,4 +34,6 @@ __all__ = [
     "FarmDataResponse",
     "FarmDataListResponse",
     "AnalyticsResponse",
+    "ModelVersionResponse",
+    "ModelUpdateCheckResponse",
 ]

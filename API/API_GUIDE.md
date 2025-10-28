@@ -103,6 +103,18 @@ uvicorn app.main:app --reload
 - Delete all user's farm data (GDPR compliance)
 - Returns: Count of deleted records
 
+### ML Model Distribution
+
+**GET /api/v1/models/latest**
+- Get latest active ML model version
+- No authentication required
+- Returns: Model info (version, download URL, size, preprocessing config)
+
+**GET /api/v1/models/check-update**
+- Check if newer model version available
+- Query params: `current_version` (required), `app_version` (optional)
+- Returns: Update status, latest version info if available
+
 ### Health Check
 
 **GET /health**
@@ -120,6 +132,20 @@ CREATE TABLE users (
     created_at TIMESTAMP NOT NULL,
     last_sync_at TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE
+);
+```
+
+### Model Versions Table
+```sql
+CREATE TABLE model_versions (
+    id UUID PRIMARY KEY,
+    version VARCHAR(50) UNIQUE NOT NULL,
+    model_url TEXT NOT NULL,
+    model_size_bytes BIGINT,
+    preprocessing_config JSONB,
+    is_active BOOLEAN DEFAULT TRUE,
+    min_app_version VARCHAR(20),
+    created_at TIMESTAMP NOT NULL
 );
 ```
 
