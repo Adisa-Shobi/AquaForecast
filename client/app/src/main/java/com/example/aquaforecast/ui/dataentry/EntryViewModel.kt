@@ -3,6 +3,7 @@ package com.example.aquaforecast.ui.dataentry
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aquaforecast.domain.model.FarmData
+import com.example.aquaforecast.domain.model.Pond
 import com.example.aquaforecast.domain.model.ValidationHelper
 import com.example.aquaforecast.domain.repository.FarmDataRepository
 import com.example.aquaforecast.domain.repository.PondRepository
@@ -22,44 +23,70 @@ class EntryViewModel(
     val state = _state.asStateFlow()
 
     init {
-        observePondConfig()
+        loadPonds()
     }
 
     /**
-     * Observe pond configuration changes in real-time
-     * Automatically updates when user modifies pond settings
+     * Refresh ponds list - call when navigating to this screen
      */
-    private fun observePondConfig() {
+    fun refreshPonds() {
+        loadPonds()
+    }
+
+    /**
+     * Load all available ponds
+     */
+    private fun loadPonds() {
         viewModelScope.launch {
-            pondRepository.observePondConfig().collect { pond ->
-                _state.update {
-                    it.copy(
-                        pondId = pond?.id?.toString(),
-                        pondName = pond?.name,
-                        isLoading = false,
-                        error = if (pond == null) "No pond configured. Please configure a pond first." else null
-                    )
+            _state.update { it.copy(isLoading = true) }
+
+            pondRepository.getAllPonds()
+                .onSuccess { ponds ->
+                    val selectedPond = ponds.firstOrNull()
+                    _state.update {
+                        it.copy(
+                            availablePonds = ponds,
+                            selectedPond = selectedPond,
+                            pondId = selectedPond?.id?.toString(),
+                            pondName = selectedPond?.name,
+                            isLoading = false,
+                            error = if (ponds.isEmpty()) "No ponds available. Please create a pond first." else null
+                        )
+                    }
                 }
-            }
+                .onError { message ->
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            error = "Failed to load ponds: $message"
+                        )
+                    }
+                }
         }
     }
 
     /**
-     * Manually refresh pond configuration
+     * Manually refresh pond list
      * Called by pull-to-refresh or user action
      */
     fun refreshPondInfo() {
         viewModelScope.launch {
             _state.update { it.copy(isRefreshing = true) }
 
-            pondRepository.get()
-                .onSuccess { pond ->
+            pondRepository.getAllPonds()
+                .onSuccess { ponds ->
+                    // Keep current selection if it still exists, otherwise select first
+                    val currentId = _state.value.selectedPond?.id
+                    val selectedPond = ponds.firstOrNull { it.id == currentId } ?: ponds.firstOrNull()
+
                     _state.update {
                         it.copy(
-                            pondId = pond?.id?.toString(),
-                            pondName = pond?.name,
+                            availablePonds = ponds,
+                            selectedPond = selectedPond,
+                            pondId = selectedPond?.id?.toString(),
+                            pondName = selectedPond?.name,
                             isRefreshing = false,
-                            error = if (pond == null) "No pond configured. Please configure a pond first." else null
+                            error = if (ponds.isEmpty()) "No ponds available. Please create a pond first." else null
                         )
                     }
                 }
@@ -67,10 +94,42 @@ class EntryViewModel(
                     _state.update {
                         it.copy(
                             isRefreshing = false,
-                            error = "Failed to load pond info: $message"
+                            error = "Failed to load ponds: $message"
                         )
                     }
                 }
+        }
+    }
+
+    /**
+     * Handle pond selection from dropdown
+     */
+    fun onPondSelected(pond: Pond) {
+        _state.update {
+            it.copy(
+                selectedPond = pond,
+                pondId = pond.id.toString(),
+                pondName = pond.name,
+                isPondDropdownExpanded = false
+            )
+        }
+    }
+
+    /**
+     * Toggle pond dropdown visibility
+     */
+    fun togglePondDropdown() {
+        _state.update {
+            it.copy(isPondDropdownExpanded = !it.isPondDropdownExpanded)
+        }
+    }
+
+    /**
+     * Dismiss pond dropdown
+     */
+    fun dismissPondDropdown() {
+        _state.update {
+            it.copy(isPondDropdownExpanded = false)
         }
     }
 
@@ -272,6 +331,88 @@ class EntryViewModel(
                 currentState.pondId != null
 
         _state.update { it.copy(canSave = canSave) }
+    }
+
+    /**
+     * Show report death dialog
+     */
+    fun showReportDeathDialog() {
+        _state.update { it.copy(showReportDeathDialog = true) }
+    }
+
+    /**
+     * Hide report death dialog
+     */
+    fun hideReportDeathDialog() {
+        _state.update { it.copy(showReportDeathDialog = false) }
+    }
+
+    /**
+     * Show harvest confirmation dialog
+     */
+    fun showHarvestDialog() {
+        _state.update { it.copy(showHarvestDialog = true) }
+    }
+
+    /**
+     * Hide harvest confirmation dialog
+     */
+    fun hideHarvestDialog() {
+        _state.update { it.copy(showHarvestDialog = false) }
+    }
+
+    /**
+     * Report fish deaths and update stock count
+     */
+    fun reportFishDeaths(deathCount: Int) {
+        viewModelScope.launch {
+            val pondId = _state.value.selectedPond?.id ?: return@launch
+
+            _state.update { it.copy(showReportDeathDialog = false) }
+
+            pondRepository.reportFishDeaths(pondId, deathCount)
+                .onSuccess {
+                    _state.update {
+                        it.copy(
+                            successMessage = "Fish deaths reported. Stock count updated."
+                        )
+                    }
+                    // Refresh pond info to get updated stock count
+                    refreshPondInfo()
+                }
+                .onError { message ->
+                    _state.update {
+                        it.copy(error = message)
+                    }
+                }
+        }
+    }
+
+    /**
+     * Mark pond as harvested
+     */
+    fun markPondAsHarvested() {
+        viewModelScope.launch {
+            val pondId = _state.value.selectedPond?.id ?: return@launch
+
+            _state.update { it.copy(showHarvestDialog = false) }
+
+            pondRepository.markPondAsHarvested(pondId)
+                .onSuccess {
+                    _state.update {
+                        it.copy(
+                            successMessage = "Pond marked as harvested. It is now read-only."
+                        )
+                    }
+                    // Refresh pond info to get updated harvest status
+                    refreshPondInfo()
+                }
+                .onError { message ->
+                    _state.update {
+                        it.copy(error = message)
+                    }
+                }
+        }
     }
 
     /**

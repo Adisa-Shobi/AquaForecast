@@ -141,11 +141,10 @@ class UserService:
             user_id: Internal user ID
 
         Returns:
-            Number of readings (0 for now, will be implemented with farm_data table)
+            Number of readings
         """
-        # TODO: Implement when farm_data table is added
-        # For now, return 0 as we only have user authentication
-        return 0
+        from app.services.farm_data_service import FarmDataService
+        return FarmDataService.get_reading_count(db, user_id)
 
     @staticmethod
     def deactivate_user(db: Session, user_id: str) -> bool:

@@ -12,6 +12,13 @@ import kotlinx.coroutines.flow.Flow
 interface PondDao {
 
     /**
+     * Get all ponds
+     * Returns list of all ponds ordered by creation date
+     */
+    @Query("SELECT * FROM pond ORDER BY created_at DESC")
+    suspend fun getAllPonds(): List<PondEntity>
+
+    /**
      * Get the current pond configuration
      * Returns null if no pond is configured
      */

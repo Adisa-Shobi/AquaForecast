@@ -14,12 +14,11 @@ import org.koin.androidx.compose.koinViewModel
 private const val TAG = "SplashScreen"
 
 /**
- * Splash screen that checks authentication status
- * and navigates to appropriate screen
+ * Splash screen - No longer used
+ * Authentication is now optional, app goes directly to MainScreen
  */
 @Composable
 fun SplashScreen(
-    onNavigateToLogin: () -> Unit,
     onNavigateToHome: () -> Unit,
     viewModel: SplashViewModel = koinViewModel()
 ) {
@@ -28,7 +27,6 @@ fun SplashScreen(
     // Handle navigation based on state
     LaunchedEffect(state) {
         when (state) {
-            is SplashState.NavigateToLogin -> onNavigateToLogin()
             is SplashState.NavigateToHome -> onNavigateToHome()
             is SplashState.Loading -> { /* Stay on splash */ }
         }

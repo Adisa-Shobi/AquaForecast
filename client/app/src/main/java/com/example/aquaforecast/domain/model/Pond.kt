@@ -14,7 +14,8 @@ data class Pond(
     val stockCount: Int,
     @Serializable(with = LocalDateSerializer::class)
     val startDate: LocalDate,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val isHarvested: Boolean = false
 ) {
     val daysInOperation: Int
         get() {

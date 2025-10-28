@@ -27,7 +27,7 @@ val OnBackground = Color(0xFF1A1C1E)
 val Surface = Color(0xFFFFFFFF)
 val OnSurface = Color(0xFF1A1C1E)
 val SurfaceVariant = Color(0xFFF1F5F9)
-val OnSurfaceVariant = Color(0xFF43474E)
+val OnSurfaceVariant = Color(0xFF9E9E9E)
 
 // Chart Colors
 val ChartLine = Color(0xFF3B82F6) // Blue for line charts

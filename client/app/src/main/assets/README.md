@@ -27,7 +27,7 @@ This file contains:
 
 ## Model Requirements
 
-### Input: 16 Features (Normalized using RobustScaler)
+### Input: 15 Features (Normalized using RobustScaler)
 
 **Base features (7):**
 1. temperature(c)
@@ -38,7 +38,7 @@ This file contains:
 6. turbidity(ntu)
 7. population
 
-**Engineered features (9):**
+**Engineered features (8):**
 8. days_in_farm - Days since pond creation
 9. day_of_year - Seasonal feature (1-366)
 10. hour - Hour of day (0-23)
@@ -46,7 +46,6 @@ This file contains:
 12. cos_hour - Cyclic encoding of hour
 13. temp_do_interaction - temperature × dissolved_oxygen
 14. avg_do_7d - 7-day rolling average of DO
-15. feeding_efficiency - fish_weight / (days_in_farm + 1)
 16. avg_wqi_7d - Water quality deviation: |avg_do_7d - optimal_do| / optimal_do
 
 ### Output: 2 Predictions
@@ -102,7 +101,7 @@ Once you place the model file:
 ### Model Training
 
 Ensure your model is trained with:
-- Input shape: `(batch_size, 16)`
+- Input shape: `(batch_size, 15)`
 - Output shape: `(batch_size, 2)`
 - Compatible with TensorFlow Lite format
 

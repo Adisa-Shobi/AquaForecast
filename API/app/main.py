@@ -58,25 +58,6 @@ app = FastAPI(
     version=settings.VERSION,
     description="""
     Privacy-first REST API for aquaculture water quality data collection and analytics.
-
-    ## Features
-
-    - 🔐 **Secure Authentication**: Firebase-based authentication
-    - 🌊 **Water Quality Data**: Sync water parameters with user consent
-    - 🔒 **Privacy-First**: Only water parameters stored, predictions stay local
-    - 📊 **Analytics**: Aggregated regional water quality insights
-
-    ## Data Privacy
-
-    **What we collect (with consent)**:
-    - ✅ Email and authentication IDs only
-    - ✅ Water quality parameters (temperature, pH, DO, ammonia, nitrate, turbidity)
-    - ✅ Location data for analytics grouping
-
-    **What stays local**:
-    - ❌ Farm and pond configurations
-    - ❌ Predictions and feeding schedules
-    - ❌ User profile information (name, photo, etc.)
     """,
     lifespan=lifespan,
     docs_url="/docs",

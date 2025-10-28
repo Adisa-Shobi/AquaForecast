@@ -1,0 +1,102 @@
+{
+  "scaler": {
+    "center": [
+      24.5,
+      7.18075,
+      6.178,
+      3.96914,
+      500.0,
+      94.0,
+      52.52468171296296,
+      212.0,
+      12.0,
+      0.0,
+      6.123233995736766e-17,
+      151.729875,
+      7.108714285714266,
+      0.4666666666666666
+    ],
+    "scale": [
+      1.3125,
+      0.7126999999999999,
+      11.652000000000001,
+      4.54158,
+      205.0,
+      66.0,
+      75.70102430555555,
+      47.0,
+      13.0,
+      1.4142135623730951,
+      1.4142135623730954,
+      284.63603125000003,
+      10.103571428571422,
+      1.1624523809523821
+    ],
+    "feature_names": [
+      "temperature(c)",
+      "ph",
+      "dissolved_oxygen(g/ml)",
+      "ammonia(g/ml)",
+      "nitrate(g/ml)",
+      "turbidity(ntu)",
+      "days_in_farm",
+      "day_of_year",
+      "hour",
+      "sin_hour",
+      "cos_hour",
+      "temp_do_interaction",
+      "avg_do_7d",
+      "avg_wqi_7d"
+    ]
+  },
+  "imputation_medians": {
+    "temperature(c)": 24.5,
+    "ph": 7.18529,
+    "dissolved_oxygen(g/ml)": 6.195,
+    "ammonia(g/ml)": 3.96914,
+    "nitrate(g/ml)": 500.0,
+    "turbidity(ntu)": 94.0,
+    "days_in_farm": 52.497696759259256,
+    "day_of_year": 212.0,
+    "hour": 12.0,
+    "sin_hour": 0.0,
+    "cos_hour": 6.123233995736766e-17,
+    "temp_do_interaction": 152.026375,
+    "avg_do_7d": 7.117428571428566,
+    "avg_wqi_7d": 0.4666666666666666
+  },
+  "biological_limits": {
+    "temperature(c)": [
+      20,
+      35
+    ],
+    "ph": [
+      5.0,
+      9.0
+    ],
+    "dissolved_oxygen(g/ml)": [
+      0,
+      15
+    ],
+    "ammonia(g/ml)": [
+      0,
+      5
+    ],
+    "nitrate(g/ml)": [
+      0,
+      500
+    ],
+    "turbidity(ntu)": [
+      0,
+      500
+    ]
+  },
+  "constants": {
+    "optimal_do": 6.0,
+    "initial_day_offset": 1
+  },
+  "target_columns": [
+    "fish_weight(g)",
+    "fish_length(cm)"
+  ]
+}

@@ -15,5 +15,7 @@ data class PondEntity(
     @ColumnInfo(name = "start_date")
     val startDate: Long,
     @ColumnInfo(name = "created_at")
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "is_harvested")
+    val isHarvested: Boolean = false
 )

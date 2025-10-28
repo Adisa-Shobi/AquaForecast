@@ -1,6 +1,7 @@
 package com.example.aquaforecast.data.ml
 
 import android.content.Context
+import android.util.Log
 import com.example.aquaforecast.domain.model.FarmData
 import com.example.aquaforecast.domain.model.Pond
 import kotlinx.serialization.json.Json
@@ -15,15 +16,15 @@ import kotlin.math.sin
 /**
  * Handles feature engineering and preprocessing for ML model input
  *
- * This class implements the EXACT 7-step preprocessing pipeline:
  * 1. Get Current Farm Data (7 base features)
- * 2. Apply Biological Caps
- * 3. Engineer 9 Additional Features
- * 4. Create Ordered Feature Array (16 features)
- * 5. Impute Missing Values
- * 6. Ensure Non-Negatives
- * 7. Scale Features (RobustScaler)
+ * 2. Apply Biological Caps (lines 429-443)
+ * 3. Engineer 8 Additional Features (lines 328-371)
+ * 4. Create Ordered Feature Array (15 total features, lines 523-533)
+ * 5. Impute Missing Values (lines 461-471)
+ * 6. Ensure Non-Negatives (lines 497-506)
+ * 7. Scale Features using RobustScaler (lines 559-562)
  *
+ * Output: FloatArray[15] ready for TFLite model input
  */
 class FeaturePreprocessor(context: Context) {
 
@@ -57,54 +58,48 @@ class FeaturePreprocessor(context: Context) {
      * @param latestData The most recent farm data entry (7 base features)
      * @param historicalData Last 7 days of farm data (for rolling averages)
      * @param pond Pond information (for days_in_farm calculation)
-     * @param fishWeight Current average fish weight in grams (optional, for feeding_efficiency)
      * @return FloatArray of 16 scaled features ready for TFLite model input
      */
     fun prepareFeatures(
         latestData: FarmData,
         historicalData: List<FarmData>,
-        pond: Pond,
-        fishWeight: Float? = null
+        pond: Pond
     ): FloatArray {
-        // STEP 1: Get Current Farm Data (7 base features)
+        // Get Current Farm Data (7 base features)
         val temperature = latestData.temperature.toFloat()
         val ph = latestData.ph.toFloat()
         val dissolvedOxygen = latestData.dissolvedOxygen.toFloat()
         val ammonia = latestData.ammonia.toFloat()
         val nitrate = latestData.nitrate.toFloat()
         val turbidity = latestData.turbidity.toFloat()
-        val population = pond.stockCount.toFloat()
 
-        // STEP 2: Apply Biological Caps
+        // Apply Biological Caps
         val cappedFeatures = applyBiologicalCaps(
             temperature, ph, dissolvedOxygen,
             ammonia, nitrate, turbidity
         )
 
-        // STEP 3: Engineer 9 Additional Features
+        // Engineer 8 Additional Features
         val engineeredFeatures = engineerFeatures(
             cappedFeatures = cappedFeatures,
-            population = population,
             pond = pond,
             latestData = latestData,
             historicalData = historicalData,
-            fishWeight = fishWeight
         )
 
-        // STEP 4: Create Ordered Feature Array (16 features)
+        // Create Ordered Feature Array (15 features)
         val orderedFeatures = createOrderedFeatureArray(
             cappedFeatures = cappedFeatures,
-            population = population,
             engineeredFeatures = engineeredFeatures
         )
 
-        // STEP 5: Impute Missing Values
+        // Impute Missing Values
         val imputedFeatures = imputeMissingValues(orderedFeatures)
 
-        // STEP 6: Ensure Non-Negatives
+        // Ensure Non-Negatives
         val validatedFeatures = ensureNonNegatives(imputedFeatures)
 
-        // STEP 7: Scale Features (RobustScaler)
+        // Scale Features (RobustScaler)
         return scaleFeatures(validatedFeatures)
     }
 
@@ -138,25 +133,31 @@ class FeaturePreprocessor(context: Context) {
     }
 
     /**
-     * STEP 3: Engineer 9 Additional Features
+     * STEP 3: Engineer 8 Additional Features
+     *
+     * Creates the same engineered features as the training pipeline to capture
+     * temporal patterns, cyclic behavior, and water quality trends.
      */
     private fun engineerFeatures(
         cappedFeatures: Map<String, Float>,
-        population: Float,
         pond: Pond,
         latestData: FarmData,
         historicalData: List<FarmData>,
-        fishWeight: Float?
     ): Map<String, Float> {
         // Extract timestamp information
         val timestamp = java.time.Instant.ofEpochMilli(latestData.timestamp)
             .atZone(java.time.ZoneId.systemDefault())
 
-        // days_in_farm: Days since pond creation
+        // days_in_farm: Days since pond start date
+        // IMPORTANT: In training, this was "days since first record" for each pond.
+        // For consistency, pond.startDate should be set to the date of the FIRST data entry,
+        // not the physical pond creation date. This ensures the feature matches training data.
         val daysInFarm = ChronoUnit.DAYS.between(pond.startDate, LocalDate.now()).toFloat()
+            Log.d("FeaturePreprocessor", "daysInFarm $daysInFarm")
 
         // day_of_year: Extract from timestamp (1-366)
         val dayOfYear = timestamp.dayOfYear.toFloat()
+        Log.d("FeaturePreprocessor", "dayOfYear $dayOfYear")
 
         // hour: Extract from timestamp (0-23)
         val hour = timestamp.hour.toFloat()
@@ -168,20 +169,15 @@ class FeaturePreprocessor(context: Context) {
         // temp_do_interaction: Product of two features
         val tempDoInteraction = cappedFeatures["temperature(c)"]!! *
                 cappedFeatures["dissolved_oxygen(g/ml)"]!!
+        Log.d("FeaturePreprocessor", "tempDoInteraction $tempDoInteraction")
 
         // avg_do_7d: 7-day rolling average of DO
         val avgDo7d = calculateAvgDo7d(historicalData, cappedFeatures["dissolved_oxygen(g/ml)"]!!)
-
-        // feeding_efficiency: fishWeight / (daysInFarm + 1)
-        val feedingEfficiency = if (fishWeight != null) {
-            fishWeight / (daysInFarm + config.constants.initialDayOffset)
-        } else {
-            // Use imputation median if weight is null
-            config.imputationMedians["feeding_efficiency"] ?: 0.018f
-        }
+        Log.d("FeaturePreprocessor", "avgDo7d $avgDo7d")
 
         // avg_wqi_7d: Water quality deviation
         val avgWqi7d = abs(avgDo7d - config.constants.optimalDo) / config.constants.optimalDo
+        Log.d("FeaturePreprocessor", "avgWqi7d $avgWqi7d")
 
         return mapOf(
             "days_in_farm" to daysInFarm,
@@ -191,39 +187,39 @@ class FeaturePreprocessor(context: Context) {
             "cos_hour" to cosHour,
             "temp_do_interaction" to tempDoInteraction,
             "avg_do_7d" to avgDo7d,
-            "feeding_efficiency" to feedingEfficiency,
             "avg_wqi_7d" to avgWqi7d
         )
     }
 
     /**
      * Calculate 7-day rolling average of dissolved oxygen
+     *
+     * Matches training pipeline behavior: includes current reading in the 7-day window
+     * Equivalent to pandas: df['dissolved_oxygen'].rolling(window=7, min_periods=1).mean()
      */
     private fun calculateAvgDo7d(historicalData: List<FarmData>, currentDo: Float): Float {
         if (historicalData.isEmpty()) {
             return currentDo
         }
 
-        // Get last 7 days of DO readings
-        val doValues = historicalData.take(7).map { it.dissolvedOxygen.toFloat() }
-        return if (doValues.isNotEmpty()) {
-            doValues.average().toFloat()
-        } else {
-            currentDo
-        }
+        // Include current DO value in the 7-day average (last 6 historical + current)
+        // This matches the pandas rolling window behavior from training
+        val historicalDoValues = historicalData.take(6).map { it.dissolvedOxygen.toFloat() }
+        val allDoValues = historicalDoValues + currentDo
+
+        return allDoValues.average().toFloat()
     }
 
     /**
-     * STEP 4: Create Ordered Feature Array
-     * Combine all 16 features in the exact order from scaler.feature_names
+     * Create Ordered Feature Array
+     * Combine all 15 features in the exact order from scaler.feature_names
      */
     private fun createOrderedFeatureArray(
         cappedFeatures: Map<String, Float>,
-        population: Float,
         engineeredFeatures: Map<String, Float>
     ): FloatArray {
         // Combine all features into a single map
-        val allFeatures = cappedFeatures + mapOf("population" to population) + engineeredFeatures
+        val allFeatures = cappedFeatures + engineeredFeatures
 
         // Create array in exact order from config
         return config.scaler.featureNames.map { featureName ->
@@ -232,7 +228,7 @@ class FeaturePreprocessor(context: Context) {
     }
 
     /**
-     * STEP 5: Impute Missing Values
+     * Impute Missing Values
      * Replace any null/NaN with values from imputation_medians
      */
     private fun imputeMissingValues(features: FloatArray): FloatArray {
@@ -247,7 +243,7 @@ class FeaturePreprocessor(context: Context) {
     }
 
     /**
-     * STEP 6: Ensure Non-Negatives
+     * Ensure Non-Negatives
      * For specific features only: ammonia, nitrate, turbidity, population, days_in_farm
      */
     private fun ensureNonNegatives(features: FloatArray): FloatArray {
@@ -262,8 +258,8 @@ class FeaturePreprocessor(context: Context) {
     }
 
     /**
-     * STEP 7: Scale Features (RobustScaler)
-     * Apply: (value - center[i]) / scale[i] for each feature
+     * Scale Features (RobustScaler)
+     * Apply: (value - center[/i]) / scale[/i] for each feature
      */
     private fun scaleFeatures(features: FloatArray): FloatArray {
         return features.mapIndexed { i, value ->

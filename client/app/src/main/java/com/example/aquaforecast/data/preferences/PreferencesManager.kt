@@ -2,6 +2,7 @@ package com.example.aquaforecast.data.preferences
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +16,7 @@ class PreferencesManager(private val dataStore: DataStore<Preferences>) {
 
     companion object {
         private val FORECAST_HORIZON_KEY = intPreferencesKey("forecast_horizon_days")
+        private val OFFLINE_MODE_KEY = booleanPreferencesKey("offline_mode")
         const val DEFAULT_FORECAST_HORIZON = 20 // Default: predict 20 days into the future
     }
 
@@ -44,6 +46,31 @@ class PreferencesManager(private val dataStore: DataStore<Preferences>) {
     suspend fun getForecastHorizonValue(): Int {
         return dataStore.data.map { preferences ->
             preferences[FORECAST_HORIZON_KEY] ?: DEFAULT_FORECAST_HORIZON
+        }.first()
+    }
+
+    /**
+     * Get the offline mode setting as a Flow
+     */
+    val offlineMode: Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[OFFLINE_MODE_KEY] ?: false
+    }
+
+    /**
+     * Update the offline mode setting
+     */
+    suspend fun setOfflineMode(isOffline: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[OFFLINE_MODE_KEY] = isOffline
+        }
+    }
+
+    /**
+     * Get the current offline mode value (suspend function for one-time reads)
+     */
+    suspend fun getOfflineModeValue(): Boolean {
+        return dataStore.data.map { preferences ->
+            preferences[OFFLINE_MODE_KEY] ?: false
         }.first()
     }
 }

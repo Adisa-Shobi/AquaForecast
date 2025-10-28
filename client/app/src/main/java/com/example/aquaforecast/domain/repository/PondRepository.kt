@@ -116,4 +116,67 @@ interface PondRepository {
      *         Result.Error with message if deletion failed
      */
     suspend fun deletePondConfig(): Result<Unit>
+
+    /**
+     * Get all ponds from the database
+     * Returns a list of all configured ponds
+     *
+     * @return Result.Success with list of ponds (empty if none configured),
+     *         Result.Error with message if retrieval failed
+     */
+    suspend fun getAllPonds(): Result<List<Pond>>
+
+    /**
+     * Get a specific pond by its ID
+     *
+     * @param pondId The ID of the pond to retrieve
+     * @return Result.Success with pond or null if not found,
+     *         Result.Error with message if retrieval failed
+     */
+    suspend fun getPondById(pondId: Long): Result<Pond?>
+
+    /**
+     * Delete a specific pond by its ID
+     *
+     * @param pondId The ID of the pond to delete
+     * @return Result.Success with Unit if deleted successfully,
+     *         Result.Error with message if deletion failed
+     */
+    suspend fun deletePondById(pondId: Long): Result<Unit>
+
+    /**
+     * Get the total count of configured ponds
+     *
+     * @return Result.Success with count of ponds,
+     *         Result.Error with message if count failed
+     */
+    suspend fun getPondCount(): Result<Int>
+
+    /**
+     * Report fish deaths and update stock count
+     *
+     * @param pondId The ID of the pond
+     * @param deathCount The number of fish that died
+     * @return Result.Success with Unit if updated successfully,
+     *         Result.Error with message if update failed
+     */
+    suspend fun reportFishDeaths(pondId: Long, deathCount: Int): Result<Unit>
+
+    /**
+     * Mark a pond as harvested (readonly)
+     *
+     * @param pondId The ID of the pond to mark as harvested
+     * @return Result.Success with Unit if marked successfully,
+     *         Result.Error with message if operation failed
+     */
+    suspend fun markPondAsHarvested(pondId: Long): Result<Unit>
+
+    /**
+     * Mark a pond as not harvested (reverse harvest operation)
+     *
+     * @param pondId The ID of the pond to mark as not harvested
+     * @return Result.Success with Unit if marked successfully,
+     *         Result.Error with message if operation failed
+     */
+    suspend fun markPondAsNotHarvested(pondId: Long): Result<Unit>
 }

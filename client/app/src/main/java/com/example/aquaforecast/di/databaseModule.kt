@@ -10,10 +10,13 @@ val databaseModule = module {
         androidContext(),
         AppDatabase::class.java,
         "aquaforecast_db"
-    ).build()
+    )
+    .fallbackToDestructiveMigration()
+    .build()
     }
 
     single { get<AppDatabase>().farmDataDao() }
     single { get<AppDatabase>().pondDao() }
     single { get<AppDatabase>().predictionDao() }
+    single { get<AppDatabase>().feedingScheduleDao() }
 }
