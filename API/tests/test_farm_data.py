@@ -29,7 +29,7 @@ class TestFarmDataEndpoints:
 
         mock_get_user.return_value = test_user
 
-        # Sync request
+        # Sync request with fish measurements
         response = client.post(
             "/api/v1/farm-data/sync",
             headers={"Authorization": "Bearer mock_token"},
@@ -43,6 +43,10 @@ class TestFarmDataEndpoints:
                         "ammonia": 0.15,
                         "nitrate": 10.5,
                         "turbidity": 12.3,
+                        "fish_weight": 0.850,
+                        "fish_length": 25.5,
+                        "verified": True,
+                        "start_date": "2025-01-01",
                         "location": {"latitude": -1.2921, "longitude": 36.8219},
                         "country_code": "KE",
                         "recorded_at": "2025-01-15T08:00:00Z",
@@ -89,6 +93,10 @@ class TestFarmDataEndpoints:
                         "ammonia": 0.15,
                         "nitrate": 10.5,
                         "turbidity": 12.3,
+                        "fish_weight": 1.2,
+                        "fish_length": 30.0,
+                        "verified": False,
+                        "start_date": "2025-01-01",
                         "location": {"latitude": -1.2921, "longitude": 36.8219},
                         "country_code": "KE",
                         "recorded_at": "2025-01-15T08:00:00Z",
