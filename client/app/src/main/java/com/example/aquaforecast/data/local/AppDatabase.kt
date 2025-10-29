@@ -18,7 +18,7 @@ import com.example.aquaforecast.data.local.entity.PredictionEntity
     PredictionEntity::class,
     FeedingScheduleEntity::class
                ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 //@TypeConverters(Converters::class)

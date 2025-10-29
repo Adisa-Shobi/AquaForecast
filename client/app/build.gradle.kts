@@ -25,7 +25,7 @@ android {
         debug {
             isDebuggable = true
 
-            buildConfigField("String", "API_BASE_URL", "\"https://dev-api.yourbackend.com/\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://aquaforecast.onrender.com/\"")
             buildConfigField("Boolean", "ENABLE_DATABASE_BOOTSTRAP", "true")
         }
         release {
@@ -34,7 +34,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("String", "API_BASE_URL", "\"https://api.yourbackend.com/\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://aquaforecast.onrender.com/\"")
             buildConfigField("Boolean", "ENABLE_DATABASE_BOOTSTRAP", "false")
         }
     }
@@ -90,16 +90,18 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+    // Google Play Services
+    implementation(libs.play.services.location)
     // Room DB
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     // Testing
     testImplementation(libs.junit)
-    testImplementation("io.mockk:mockk:1.13.8")
-    testImplementation("org.robolectric:robolectric:4.11.1")
-    testImplementation("androidx.test:core:1.5.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation(libs.mockk)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.core)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

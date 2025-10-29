@@ -33,6 +33,9 @@ val repositoryModule = module {
     single <SyncRepository>{ SyncRepositoryImpl(
         apiService = get(),
         farmDataDao = get(),
-        androidContext()
+        predictionDao = get(),
+        pondDao = get(),
+        firebaseAuth = get(),
+        context = androidContext()
     ) }
 }
