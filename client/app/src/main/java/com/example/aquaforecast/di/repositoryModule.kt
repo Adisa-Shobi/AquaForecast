@@ -10,14 +10,26 @@ import com.example.aquaforecast.domain.repository.FarmDataRepository
 import com.example.aquaforecast.domain.repository.PondRepository
 import com.example.aquaforecast.domain.repository.PredictionRepository
 import com.example.aquaforecast.domain.repository.SyncRepository
+import com.google.firebase.auth.FirebaseAuth
+import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
 val repositoryModule = module {
+
+    single { FirebaseAuth.getInstance() }
+
+    single<AuthRepository> {
+        AuthRepositoryImpl(firebaseAuth = get())
+    }
     singleOf(::FarmDataRepositoryImpl) {bind<FarmDataRepository>()}
     singleOf(::PondRepositoryImpl) {bind<PondRepository>()}
     singleOf(::PredictionRepositoryImpl) {bind<PredictionRepository>()}
-    singleOf(::AuthRepositoryImpl) {bind<AuthRepository>()}
-    singleOf(::SyncRepositoryImpl) {bind<SyncRepository>()}
+
+    single <SyncRepository>{ SyncRepositoryImpl(
+        apiService = get(),
+        farmDataDao = get(),
+        androidContext()
+    ) }
 }
