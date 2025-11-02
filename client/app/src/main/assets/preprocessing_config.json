@@ -1,40 +1,36 @@
 {
   "scaler": {
     "center": [
-      28.0,
-      7.0,
-      6.5,
-      0.3,
-      1.0,
-      12.0,
+      24.5,
+      7.18075,
+      6.178,
+      3.96914,
       500.0,
-      90.0,
-      180.0,
+      94.0,
+      52.52468171296296,
+      212.0,
       12.0,
       0.0,
-      0.0,
-      182.0,
-      6.5,
-      0.018,
-      72.0
+      6.123233995736766e-17,
+      151.729875,
+      7.108714285714266,
+      0.4666666666666666
     ],
     "scale": [
-      4.0,
-      1.0,
-      2.0,
-      0.4,
-      1.0,
-      8.0,
-      300.0,
-      60.0,
-      180.0,
-      12.0,
-      1.4,
-      1.4,
-      120.0,
-      2.0,
-      0.015,
-      20.0
+      1.3125,
+      0.7126999999999999,
+      11.652000000000001,
+      4.54158,
+      205.0,
+      66.0,
+      75.70102430555555,
+      47.0,
+      13.0,
+      1.4142135623730951,
+      1.4142135623730954,
+      284.63603125000003,
+      10.103571428571422,
+      1.1624523809523821
     ],
     "feature_names": [
       "temperature(c)",
@@ -43,7 +39,6 @@
       "ammonia(g/ml)",
       "nitrate(g/ml)",
       "turbidity(ntu)",
-      "population",
       "days_in_farm",
       "day_of_year",
       "hour",
@@ -51,35 +46,50 @@
       "cos_hour",
       "temp_do_interaction",
       "avg_do_7d",
-      "feeding_efficiency",
       "avg_wqi_7d"
     ]
   },
   "imputation_medians": {
-    "temperature(c)": 28.5,
-    "ph": 7.0,
-    "dissolved_oxygen(g/ml)": 6.5,
-    "ammonia(g/ml)": 0.3,
-    "nitrate(g/ml)": 1.0,
-    "turbidity(ntu)": 12.0,
-    "population": 500.0,
-    "days_in_farm": 90.0,
-    "day_of_year": 180.0,
+    "temperature(c)": 24.5,
+    "ph": 7.18529,
+    "dissolved_oxygen(g/ml)": 6.195,
+    "ammonia(g/ml)": 3.96914,
+    "nitrate(g/ml)": 500.0,
+    "turbidity(ntu)": 94.0,
+    "days_in_farm": 52.497696759259256,
+    "day_of_year": 212.0,
     "hour": 12.0,
     "sin_hour": 0.0,
-    "cos_hour": 0.0,
-    "temp_do_interaction": 182.0,
-    "avg_do_7d": 6.5,
-    "feeding_efficiency": 0.018,
-    "avg_wqi_7d": 72.0
+    "cos_hour": 6.123233995736766e-17,
+    "temp_do_interaction": 152.026375,
+    "avg_do_7d": 7.117428571428566,
+    "avg_wqi_7d": 0.4666666666666666
   },
   "biological_limits": {
-    "temperature(c)": [20.0, 35.0],
-    "ph": [5.0, 9.0],
-    "dissolved_oxygen(g/ml)": [0.0, 15.0],
-    "ammonia(g/ml)": [0.0, 5.0],
-    "nitrate(g/ml)": [0.0, 500.0],
-    "turbidity(ntu)": [0.0, 500.0]
+    "temperature(c)": [
+      20,
+      35
+    ],
+    "ph": [
+      5.0,
+      9.0
+    ],
+    "dissolved_oxygen(g/ml)": [
+      0,
+      15
+    ],
+    "ammonia(g/ml)": [
+      0,
+      5
+    ],
+    "nitrate(g/ml)": [
+      0,
+      500
+    ],
+    "turbidity(ntu)": [
+      0,
+      500
+    ]
   },
   "constants": {
     "optimal_do": 6.0,

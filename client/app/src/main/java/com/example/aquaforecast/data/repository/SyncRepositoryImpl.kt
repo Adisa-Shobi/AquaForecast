@@ -1,49 +1,84 @@
 package com.example.aquaforecast.data.repository
 
+import android.content.Context
+import android.location.Location
+import android.util.Log
 import com.example.aquaforecast.data.local.dao.FarmDataDao
-
+import com.example.aquaforecast.data.local.dao.PondDao
+import com.example.aquaforecast.data.local.dao.PredictionDao
 import com.example.aquaforecast.data.remote.ApiService
-import com.example.aquaforecast.data.remote.dto.FarmDataDto
-import com.example.aquaforecast.domain.repository.SyncRepository
-import kotlinx.coroutines.withContext
+import com.example.aquaforecast.data.remote.dto.FarmDataReading
+import com.example.aquaforecast.data.remote.dto.FarmDataSyncRequest
+import com.example.aquaforecast.data.remote.dto.LocationData
 import com.example.aquaforecast.domain.repository.Result
+import com.example.aquaforecast.domain.repository.SyncRepository
 import com.example.aquaforecast.domain.repository.asError
 import com.example.aquaforecast.domain.repository.asSuccess
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
-import android.content.Context
-import android.util.Log
-import java.io.File
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 
 /**
  * Implementation of SyncRepository
- * Handles backend synchronization and model updates with explicit HTTP status handling
+ * Handles backend synchronization with proper data mapping including:
+ * - Water quality parameters
+ * - Fish predictions (weight, length)
+ * - User verification status
+ * - Pond cycle start date
+ * - Device location and country
  */
 class SyncRepositoryImpl(
     private val apiService: ApiService,
     private val farmDataDao: FarmDataDao,
+    private val predictionDao: PredictionDao,
+    private val pondDao: PondDao,
+    private val firebaseAuth: FirebaseAuth,
     private val context: Context
 ) : SyncRepository {
 
     companion object {
         private const val TAG = "SyncRepository"
-        private const val MODEL_FILE_NAME = "fish_model.tflite"
-        private const val MODEL_BACKUP_NAME = "${MODEL_FILE_NAME}.backup"
         private const val LAST_SYNC_KEY = "last_sync_time"
-        private const val MODEL_VERSION_KEY = "model_version"
         private const val SYNC_PREFS = "sync_prefs"
+        private const val MODEL_VERSION_KEY = "model_version"
         private const val MODEL_PREFS = "model_prefs"
-        private const val BUFFER_SIZE = 8192
     }
 
     override suspend fun syncData(): Result<Int> = withContext(Dispatchers.IO) {
         try {
-            // Get unsynced data from local database
+            // Get Firebase auth token
+            val currentUser = firebaseAuth.currentUser
+            if (currentUser == null) {
+                Log.e(TAG, "No authenticated user")
+                return@withContext "Please sign in to sync data".asError()
+            }
+
+            val token = try {
+                currentUser.getIdToken(false).await().token
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get Firebase token", e)
+                return@withContext "Authentication failed. Please sign in again".asError()
+            }
+
+            if (token == null) {
+                Log.e(TAG, "Firebase token is null")
+                return@withContext "Authentication token unavailable".asError()
+            }
+
+            // Get unsynced data
             val unsyncedEntities = farmDataDao.getUnsyncedData()
 
-            // Early return if nothing to sync
             if (unsyncedEntities.isEmpty()) {
                 Log.d(TAG, "No unsynced data to upload")
                 return@withContext 0.asSuccess()
@@ -51,24 +86,70 @@ class SyncRepositoryImpl(
 
             Log.d(TAG, "Syncing ${unsyncedEntities.size} entries")
 
-            // Convert entities to DTOs for API
-            val dtos = unsyncedEntities.map { entity ->
-                FarmDataDto(
-                    temperature = entity.temperature,
-                    ph = entity.ph,
-                    dissolvedOxygen = entity.dissolvedOxygen,
-                    ammonia = entity.ammonia,
-                    nitrate = entity.nitrate,
-                    turbidity = entity.turbidity,
-                    timestamp = entity.timestamp,
-                    pondId = entity.pondId
-                )
+            // Get device location
+            val location = getDeviceLocation()
+
+            // Map entities to DTOs
+            val readings = unsyncedEntities.mapNotNull { entity ->
+                try {
+                    // Get pond data for start date
+                    val pond = pondDao.getPondById(entity.pondId)
+                    if (pond == null) {
+                        Log.w(TAG, "Pond not found for entry ${entity.id}")
+                        return@mapNotNull null
+                    }
+
+                    // Get prediction data if available
+                    val prediction = predictionDao.getPredictionByFarmDataId(entity.id)
+
+                    // Format timestamp to ISO 8601
+                    val recordedAt = formatTimestampISO(entity.timestamp)
+                    val startDate = formatDateISO(pond.startDate)
+
+                    FarmDataReading(
+                        temperature = entity.temperature,
+                        ph = entity.ph,
+                        dissolvedOxygen = entity.dissolvedOxygen,
+                        ammonia = entity.ammonia,
+                        nitrate = entity.nitrate,
+                        turbidity = entity.turbidity,
+                        fishWeight = prediction?.predictedWeight,
+                        fishLength = prediction?.predictedLength,
+                        verified = prediction?.verified ?: false,
+                        startDate = startDate,
+                        location = LocationData(
+                            latitude = location?.latitude ?: 0.0,
+                            longitude = location?.longitude ?: 0.0
+                        ),
+                        countryCode = getCountryCode(location),
+                        recordedAt = recordedAt
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error mapping entity ${entity.id}", e)
+                    null
+                }
             }
 
-            // Upload to backend
-            val response = apiService.syncFarmData(dtos)
+            if (readings.isEmpty()) {
+                Log.w(TAG, "No valid readings to sync after mapping")
+                return@withContext "No valid data to sync".asError()
+            }
 
-            // Check HTTP status
+            // Get device ID
+            val deviceId = android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID
+            )
+
+            // Create sync request
+            val request = FarmDataSyncRequest(
+                deviceId = deviceId,
+                readings = readings
+            )
+
+            // Upload to backend
+            val response = apiService.syncFarmData("Bearer $token", request)
+
             if (response.isSuccessful) {
                 val body = response.body()
 
@@ -77,20 +158,20 @@ class SyncRepositoryImpl(
                     return@withContext "Sync failed: Empty response from server".asError()
                 }
 
-                // Check if backend reports success
-                if (body.success) {
-                    // Mark entries as synced in local database
+                if (body.success && body.data != null) {
+                    // Mark entries as synced
                     val ids = unsyncedEntities.map { it.id }
                     farmDataDao.markAsSynced(ids)
 
                     // Save sync timestamp
                     saveSyncTime()
 
-                    Log.d(TAG, "Successfully synced ${body.syncedCount} entries")
-                    body.syncedCount.asSuccess()
+                    Log.d(TAG, "Successfully synced ${body.data.syncedCount} entries")
+                    body.data.syncedCount.asSuccess()
                 } else {
-                    Log.e(TAG, "Sync failed: ${body.message}")
-                    "Sync failed: ${body.message}".asError()
+                    val errorMsg = body.error?.message ?: "Unknown error"
+                    Log.e(TAG, "Sync failed: $errorMsg")
+                    "Sync failed: $errorMsg".asError()
                 }
             } else {
                 val errorMsg = "HTTP ${response.code()}: ${response.message()}"
@@ -116,25 +197,25 @@ class SyncRepositoryImpl(
         try {
             Log.d(TAG, "Checking for model updates")
 
-            val response = apiService.checkModelVersion()
+            val localVersion = getLocalModelVersion()
+            val response = apiService.checkModelUpdate(localVersion)
 
-            // Check HTTP status
             if (response.isSuccessful) {
                 val body = response.body()
 
                 if (body == null) {
-                    Log.e(TAG, "Model version response body is null")
+                    Log.e(TAG, "Model update response body is null")
                     return@withContext "Failed to check model version: Empty response".asError()
                 }
 
-                val serverVersion = body.version
-                val localVersion = getLocalModelVersion()
-
-                val updateAvailable = serverVersion > localVersion
-
-                Log.d(TAG, "Model check: Server v$serverVersion, Local v$localVersion, Update available: $updateAvailable")
-
-                updateAvailable.asSuccess()
+                if (body.success && body.data != null) {
+                    val updateAvailable = body.data.isActive
+                    Log.d(TAG, "Model update check: ${if (updateAvailable) "Update available" else "Up to date"}")
+                    updateAvailable.asSuccess()
+                } else {
+                    Log.w(TAG, "No model update available")
+                    false.asSuccess()
+                }
             } else {
                 val errorMsg = "HTTP ${response.code()}: ${response.message()}"
                 Log.e(TAG, "Model version check failed: $errorMsg")
@@ -157,93 +238,12 @@ class SyncRepositoryImpl(
 
     override suspend fun downloadModel(): Result<String> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "Starting model download")
-
-            val response = apiService.downloadModel()
-
-            // Check HTTP status
-            if (response.isSuccessful) {
-                val body = response.body()
-
-                if (body == null) {
-                    Log.e(TAG, "Model download response body is null")
-                    return@withContext "Model download failed: Empty response".asError()
-                }
-
-                val modelFile = File(context.filesDir, MODEL_FILE_NAME)
-                val backupFile = File(context.filesDir, MODEL_BACKUP_NAME)
-
-                // Create backup of existing model
-                if (modelFile.exists()) {
-                    Log.d(TAG, "Creating backup of existing model")
-                    modelFile.copyTo(backupFile, overwrite = true)
-                }
-
-                // Download and write new model
-                var bytesWritten = 0L
-                body.byteStream().use { inputStream ->
-                    modelFile.outputStream().use { outputStream ->
-                        val buffer = ByteArray(BUFFER_SIZE)
-                        var bytesRead: Int
-                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                            outputStream.write(buffer, 0, bytesRead)
-                            bytesWritten += bytesRead
-                        }
-                        outputStream.flush()
-                    }
-                }
-
-                Log.d(TAG, "Downloaded $bytesWritten bytes")
-
-                // Verify file integrity
-                if (!modelFile.exists()) {
-                    Log.e(TAG, "Model file does not exist after download")
-                    restoreBackup()
-                    return@withContext "Model download failed: File not created".asError()
-                }
-
-                if (modelFile.length() == 0L) {
-                    Log.e(TAG, "Downloaded model file is empty")
-                    restoreBackup()
-                    return@withContext "Model download failed: File is empty".asError()
-                }
-
-                // Basic TFLite file validation (check magic bytes)
-                val isValidTFLite = modelFile.inputStream().use { input ->
-                    val header = ByteArray(4)
-                    val bytesRead = input.read(header)
-                    bytesRead == 4 // Basic check - could add more validation
-                }
-
-                if (!isValidTFLite) {
-                    Log.e(TAG, "Downloaded file is not a valid TFLite model")
-                    restoreBackup()
-                    return@withContext "Model download failed: Invalid model file".asError()
-                }
-
-                // Success - update version and cleanup
-                incrementModelVersion()
-                backupFile.delete()
-
-                Log.d(TAG, "Model downloaded successfully: ${modelFile.absolutePath}")
-                modelFile.absolutePath.asSuccess()
-            } else {
-                val errorMsg = "HTTP ${response.code()}: ${response.message()}"
-                Log.e(TAG, "Model download failed: $errorMsg")
-                "Model download failed: $errorMsg".asError()
-            }
-        } catch (e: HttpException) {
-            Log.e(TAG, "HTTP error during model download", e)
-            restoreBackup()
-            "HTTP error ${e.code()}: ${e.message()}".asError()
-        } catch (e: IOException) {
-            Log.e(TAG, "Network error during model download", e)
-            restoreBackup()
-            "Network error: ${e.message ?: "Please check your internet connection"}".asError()
+            Log.d(TAG, "Model download not yet implemented")
+            "Model download not yet implemented".asError()
         } catch (e: Exception) {
-            Log.e(TAG, "Unexpected error during model download", e)
-            restoreBackup()
-            (e.message ?: "Failed to download model").asError()
+            val errorMsg = e.message ?: "Failed to download model"
+            Log.e(TAG, errorMsg, e)
+            errorMsg.asError()
         }
     }
 
@@ -260,8 +260,54 @@ class SyncRepositoryImpl(
     }
 
     /**
-     * Save current timestamp as last sync time to SharedPreferences
+     * Get device location using FusedLocationProviderClient
      */
+    private suspend fun getDeviceLocation(): Location? = withContext(Dispatchers.IO) {
+        try {
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+            val cancellationTokenSource = CancellationTokenSource()
+
+            @Suppress("MissingPermission")
+            val location = fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                cancellationTokenSource.token
+            ).await()
+
+            location
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to get location: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Get country code from location (simplified implementation)
+     * In production, you'd use Geocoder or a location API
+     */
+    private fun getCountryCode(location: Location?): String? {
+        // TODO: Implement proper country code lookup
+        // For now, return null - backend will accept it as optional
+        return null
+    }
+
+    /**
+     * Format timestamp to ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ)
+     */
+    private fun formatTimestampISO(timestamp: Long): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
+        return sdf.format(Date(timestamp))
+    }
+
+    /**
+     * Format date to ISO 8601 date format (YYYY-MM-DD)
+     */
+    private fun formatDateISO(timestamp: Long): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
+        return sdf.format(Date(timestamp))
+    }
+
     private fun saveSyncTime() {
         try {
             val prefs = context.getSharedPreferences(SYNC_PREFS, Context.MODE_PRIVATE)
@@ -279,60 +325,13 @@ class SyncRepositoryImpl(
         }
     }
 
-    /**
-     * Get local model version from SharedPreferences
-     * @return Model version number, 0 if not set
-     */
-    private fun getLocalModelVersion(): Int {
+    private fun getLocalModelVersion(): String {
         return try {
             val prefs = context.getSharedPreferences(MODEL_PREFS, Context.MODE_PRIVATE)
-            prefs.getInt(MODEL_VERSION_KEY, 0)
+            prefs.getString(MODEL_VERSION_KEY, "1.0.0") ?: "1.0.0"
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get local model version", e)
-            0
-        }
-    }
-
-    /**
-     * Increment model version in SharedPreferences after successful download
-     */
-    private fun incrementModelVersion() {
-        try {
-            val prefs = context.getSharedPreferences(MODEL_PREFS, Context.MODE_PRIVATE)
-            val currentVersion = prefs.getInt(MODEL_VERSION_KEY, 0)
-            val newVersion = currentVersion + 1
-            val success = prefs.edit()
-                .putInt(MODEL_VERSION_KEY, newVersion)
-                .commit()
-
-            if (success) {
-                Log.d(TAG, "Model version updated: $currentVersion -> $newVersion")
-            } else {
-                Log.w(TAG, "Failed to update model version")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Exception incrementing model version", e)
-        }
-    }
-
-    /**
-     * Restore model backup if it exists
-     * Called when model download fails
-     */
-    private fun restoreBackup() {
-        try {
-            val backupFile = File(context.filesDir, MODEL_BACKUP_NAME)
-
-            if (backupFile.exists()) {
-                val modelFile = File(context.filesDir, MODEL_FILE_NAME)
-                backupFile.copyTo(modelFile, overwrite = true)
-                backupFile.delete()
-                Log.d(TAG, "Restored model backup")
-            } else {
-                Log.d(TAG, "No backup to restore")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to restore backup", e)
+            "1.0.0"
         }
     }
 }

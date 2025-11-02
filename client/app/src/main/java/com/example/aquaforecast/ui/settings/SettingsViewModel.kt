@@ -28,6 +28,8 @@ class SettingsViewModel(
     init {
         loadPondConfig()
         loadForecastHorizon()
+        loadOfflineMode()
+        observeAuthState()
     }
 
     private fun loadPondConfig() {
@@ -53,6 +55,27 @@ class SettingsViewModel(
         viewModelScope.launch {
             preferencesManager.forecastHorizon.collect { horizon ->
                 _state.update { it.copy(forecastHorizon = horizon.toString()) }
+            }
+        }
+    }
+
+    private fun loadOfflineMode() {
+        viewModelScope.launch {
+            preferencesManager.offlineMode.collect { isOffline ->
+                _state.update { it.copy(isOfflineMode = isOffline) }
+            }
+        }
+    }
+
+    private fun observeAuthState() {
+        viewModelScope.launch {
+            authRepository.observeAuthState().collect { firebaseUser ->
+                _state.update {
+                    it.copy(
+                        isAuthenticated = firebaseUser != null,
+                        userEmail = firebaseUser?.email
+                    )
+                }
             }
         }
     }
@@ -150,8 +173,12 @@ class SettingsViewModel(
     }
 
     fun toggleOfflineMode() {
-        _state.update {
-            it.copy(isOfflineMode = !it.isOfflineMode)
+        viewModelScope.launch {
+            val newValue = !_state.value.isOfflineMode
+            preferencesManager.setOfflineMode(newValue)
+            _state.update {
+                it.copy(isOfflineMode = newValue)
+            }
         }
     }
 
@@ -224,6 +251,41 @@ class SettingsViewModel(
         }
     }
 
+    fun saveForecastSettings() {
+        val currentState = _state.value
+        val forecastHorizonError = validateForecastHorizon(currentState.forecastHorizon)
+
+        if (forecastHorizonError != null) {
+            _state.update {
+                it.copy(forecastHorizonError = forecastHorizonError)
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _state.update { it.copy(isSaving = true, error = null) }
+
+            try {
+                // Save forecast horizon to preferences
+                preferencesManager.setForecastHorizon(currentState.forecastHorizon.toInt())
+
+                _state.update {
+                    it.copy(
+                        isSaving = false,
+                        saveSuccess = true
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        isSaving = false,
+                        error = "Failed to save forecast settings: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
     fun clearSaveSuccess() {
         _state.update { it.copy(saveSuccess = false) }
     }
@@ -289,6 +351,8 @@ data class SettingsState(
     val isSpeciesDropdownExpanded: Boolean = false,
     val showDatePicker: Boolean = false,
     val isOfflineMode: Boolean = false,
+    val isAuthenticated: Boolean = false,
+    val userEmail: String? = null,
     val isSaving: Boolean = false,
     val isSyncing: Boolean = false,
     val error: String? = null,

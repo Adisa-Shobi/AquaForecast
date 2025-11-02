@@ -8,8 +8,7 @@ val mlModule = module {
     single {
         MLPredictor(
             context = androidContext(),
-            farmDataRepository = get(),
-            preferencesManager = get()
+            farmDataRepository = get()
         )
     }
 }

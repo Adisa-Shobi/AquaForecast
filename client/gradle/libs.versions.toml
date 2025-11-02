@@ -1,13 +1,18 @@
 [versions]
 agp = "8.12.3"
 converterKotlinxSerialization = "3.0.0"
+core = "1.5.0"
 credentials = "1.3.0"
 datastorePreferences = "1.1.7"
 firebaseBom = "34.4.0"
 googleid = "1.1.1"
 kotlin = "2.2.20"
+kotlinxCoroutinesTest = "1.7.3"
 leakcanaryAndroid = "2.14"
+mockk = "1.13.8"
 navigationCompose = "2.9.5"
+playServicesLocation = "21.3.0"
+robolectric = "4.11.1"
 roomCompiler = "2.8.2"
 vico = "2.2.0"
 coreKtx = "1.10.1"
@@ -26,6 +31,7 @@ tensorflowLite = "2.3.0"
 workRuntimeKtx = "2.10.5"
 
 [libraries]
+androidx-core = { module = "androidx.test:core", version.ref = "core" }
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
@@ -43,7 +49,11 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 koin-core = { module = "io.insert-koin:koin-core" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
 leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanaryAndroid" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 vico-compose = { group = "com.patrykandpatrick.vico", name = "compose", version.ref = "vico" }
 vico-compose-m3 = { group = "com.patrykandpatrick.vico", name = "compose-m3", version.ref = "vico" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

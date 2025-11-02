@@ -134,6 +134,82 @@ class PondRepositoryImpl(
             (e.message ?: "Failed to delete pond configuration").asError()
         }
     }
+
+    override suspend fun getAllPonds(): Result<List<Pond>> = withContext(Dispatchers.IO) {
+        try {
+            val entities = pondDao.getAllPonds()
+            entities.map { it.toDomain() }.asSuccess()
+        } catch (e: Exception) {
+            (e.message ?: "Failed to get all ponds").asError()
+        }
+    }
+
+    override suspend fun getPondById(pondId: Long): Result<Pond?> = withContext(Dispatchers.IO) {
+        try {
+            val entity = pondDao.getPondById(pondId)
+            entity?.toDomain().asSuccess()
+        } catch (e: Exception) {
+            (e.message ?: "Failed to get pond by ID").asError()
+        }
+    }
+
+    override suspend fun deletePondById(pondId: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            pondDao.deleteById(pondId)
+            Unit.asSuccess()
+        } catch (e: Exception) {
+            (e.message ?: "Failed to delete pond").asError()
+        }
+    }
+
+    override suspend fun getPondCount(): Result<Int> = withContext(Dispatchers.IO) {
+        try {
+            val count = pondDao.getCount()
+            count.asSuccess()
+        } catch (e: Exception) {
+            (e.message ?: "Failed to get pond count").asError()
+        }
+    }
+
+    override suspend fun reportFishDeaths(pondId: Long, deathCount: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val pond = pondDao.getPondById(pondId)
+                ?: return@withContext "Pond not found".asError()
+
+            val newStockCount = (pond.stockCount - deathCount).coerceAtLeast(0)
+            val updatedPond = pond.copy(stockCount = newStockCount)
+            pondDao.update(updatedPond)
+            Unit.asSuccess()
+        } catch (e: Exception) {
+            (e.message ?: "Failed to report fish deaths").asError()
+        }
+    }
+
+    override suspend fun markPondAsHarvested(pondId: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val pond = pondDao.getPondById(pondId)
+                ?: return@withContext "Pond not found".asError()
+
+            val updatedPond = pond.copy(isHarvested = true)
+            pondDao.update(updatedPond)
+            Unit.asSuccess()
+        } catch (e: Exception) {
+            (e.message ?: "Failed to mark pond as harvested").asError()
+        }
+    }
+
+    override suspend fun markPondAsNotHarvested(pondId: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val pond = pondDao.getPondById(pondId)
+                ?: return@withContext "Pond not found".asError()
+
+            val updatedPond = pond.copy(isHarvested = false)
+            pondDao.update(updatedPond)
+            Unit.asSuccess()
+        } catch (e: Exception) {
+            (e.message ?: "Failed to mark pond as not harvested").asError()
+        }
+    }
 }
 
 private fun Pond.toEntity(): PondEntity {
@@ -146,7 +222,8 @@ private fun Pond.toEntity(): PondEntity {
             .atStartOfDay(ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli(),
-        createdAt = createdAt
+        createdAt = createdAt,
+        isHarvested = isHarvested
     )
 }
 
@@ -159,6 +236,7 @@ private fun PondEntity.toDomain(): Pond {
         startDate = Instant.ofEpochMilli(startDate)
             .atZone(ZoneId.systemDefault())
             .toLocalDate(),
-        createdAt = createdAt
+        createdAt = createdAt,
+        isHarvested = isHarvested
     )
 }

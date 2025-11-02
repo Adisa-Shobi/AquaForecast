@@ -14,20 +14,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.aquaforecast.ui.components.AppButton
 import com.example.aquaforecast.ui.components.AppCard
-import com.example.aquaforecast.ui.components.FilledTextField
+import com.example.aquaforecast.ui.components.AppIconButton
+import com.example.aquaforecast.ui.components.AppOutlinedTextField
 import com.example.aquaforecast.ui.components.SectionHeader
 import org.koin.androidx.compose.koinViewModel
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 private const val TAG = "SettingsScreen"
 
-/**
- * Settings screen matching HTML design
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    onNavigateToPondManagement: () -> Unit = {},
+    onNavigateToLogin: () -> Unit = {},
     viewModel: SettingsViewModel = koinViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -44,33 +42,23 @@ fun SettingsScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Header
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 1.dp
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Top App Bar
+            CenterAlignedTopAppBar(
+                title = {
                     Text(
-                        text = "Farm Profile & Settings",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        text = "Settings",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        )
                     )
-                }
-            }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
 
             // Content
             Column(
@@ -80,8 +68,8 @@ fun SettingsScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Pond Details Section
-                SectionHeader(title = "Pond Details")
+                // Authentication Section
+                SectionHeader(title = "Authentication")
 
                 AppCard(
                     modifier = Modifier.fillMaxWidth(),
@@ -89,113 +77,65 @@ fun SettingsScreen(
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Pond Name
-                        FilledTextField(
-                            value = state.pondName,
-                            onValueChange = viewModel::onPondNameChanged,
-                            placeholder = "Pond Name",
-                            isError = state.pondNameError != null,
-                            errorMessage = state.pondNameError,
-                            enabled = !state.isSaving
-                        )
-
-                        // Species Dropdown
-                        ExposedDropdownMenuBox(
-                            expanded = state.isSpeciesDropdownExpanded,
-                            onExpandedChange = {
-                                if (!state.isSaving) viewModel.toggleSpeciesDropdown()
-                            }
-                        ) {
-                            FilledTextField(
-                                value = state.species.ifBlank { "Fish Type" },
-                                onValueChange = {},
-                                placeholder = "Fish Type",
-                                readOnly = true,
-                                trailingIcon = {
-                                    Icon(Icons.Default.ArrowDropDown, null)
-                                },
-                                isError = state.speciesError != null,
-                                errorMessage = state.speciesError,
-                                enabled = !state.isSaving,
-                                modifier = Modifier.menuAnchor()
-                            )
-
-                            ExposedDropdownMenu(
-                                expanded = state.isSpeciesDropdownExpanded,
-                                onDismissRequest = viewModel::dismissSpeciesDropdown
+                        if (state.isAuthenticated) {
+                            // Signed in state
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                DropdownMenuItem(
-                                    text = { Text("Tilapia") },
-                                    onClick = {
-                                        viewModel.onSpeciesChanged("Tilapia")
-                                        viewModel.dismissSpeciesDropdown()
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Signed In",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    state.userEmail?.let { email ->
+                                        Text(
+                                            text = email,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "Authenticated",
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
-                                DropdownMenuItem(
-                                    text = { Text("Catfish") },
-                                    onClick = {
-                                        viewModel.onSpeciesChanged("Catfish")
-                                        viewModel.dismissSpeciesDropdown()
-                                    }
+                            }
+
+                            AppButton(
+                                text = "Sign Out",
+                                onClick = viewModel::signOut,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            // Not signed in state
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Not Signed In",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "Sign in to sync your data across devices",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                AppButton(
+                                    text = "Sign In",
+                                    onClick = onNavigateToLogin,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
                         }
-
-                        // Fish Count
-                        FilledTextField(
-                            value = state.stockCount,
-                            onValueChange = viewModel::onStockCountChanged,
-                            placeholder = "Fish Count",
-                            isError = state.stockCountError != null,
-                            errorMessage = state.stockCountError,
-                            enabled = !state.isSaving
-                        )
-
-                        // Start Date
-                        FilledTextField(
-                            value = state.startDate?.format(
-                                DateTimeFormatter.ofPattern("MMM dd, yyyy")
-                            ) ?: "",
-                            onValueChange = {},
-                            placeholder = "Start Date",
-                            readOnly = true,
-                            trailingIcon = {
-                                IconButton(
-                                    onClick = {
-                                        if (!state.isSaving) viewModel.toggleDatePicker()
-                                    }
-                                ) {
-                                    Icon(Icons.Default.CalendarToday, "Select date")
-                                }
-                            },
-                            isError = state.startDateError != null,
-                            errorMessage = state.startDateError,
-                            enabled = !state.isSaving
-                        )
                     }
                 }
-                //
-                SectionHeader(title = "Forecast Options")
-                AppCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = 0.dp
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        FilledTextField(
-                            value = state.forecastHorizon,
-                            onValueChange = viewModel::onForecastHorizonChanged,
-                            placeholder = "Forecast Horizon (days)",
-                            isError = state.forecastHorizonError != null,
-                            errorMessage = state.forecastHorizonError,
-                            enabled = !state.isSaving
-                        )
-                    }}
-
 
                 // Sync Options Section
                 SectionHeader(title = "Sync Options")
@@ -213,28 +153,27 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Sync Data",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-
-                            IconButton(
-                                onClick = viewModel::syncData,
-                                enabled = !state.isSyncing
-                            ) {
-                                if (state.isSyncing) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Default.Sync,
-                                        contentDescription = "Sync",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Sync Data",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                if (!state.isAuthenticated) {
+                                    Text(
+                                        text = "Sign in required",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error
                                     )
                                 }
                             }
+
+                            AppIconButton(
+                                icon = Icons.Default.Sync,
+                                onClick = viewModel::syncData,
+                                enabled = !state.isSyncing && state.isAuthenticated && !state.isOfflineMode,
+                                contentDescription = "Sync",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
 
                         HorizontalDivider()
@@ -247,10 +186,17 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Offline Mode",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Offline Mode",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    text = "Disable all network requests",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
 
                             Switch(
                                 checked = state.isOfflineMode,
@@ -260,25 +206,47 @@ fun SettingsScreen(
                     }
                 }
 
-                // Account Section
-                SectionHeader(title = "Account")
+                // Forecast Options Section
+                SectionHeader(title = "Forecast Options")
+                AppCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = 0.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        AppOutlinedTextField(
+                            value = state.forecastHorizon,
+                            onValueChange = viewModel::onForecastHorizonChanged,
+                            placeholder = "Enter forecast horizon in days",
+                            label = "Forecast Horizon (days)",
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
+                            enabled = !state.isSaving,
+                            isError = state.forecastHorizonError != null,
+                            errorMessage = state.forecastHorizonError
+                        )
+                    }
+                }
 
+                // Save Forecast Settings Button
                 AppButton(
-                    text = "Sign Out",
-                    onClick = viewModel::signOut,
+                    text = if (state.isSaving) "Saving..." else "Save Forecast Settings",
+                    onClick = viewModel::saveForecastSettings,
+                    enabled = !state.isSaving,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Save button for pond configuration
-                if (state.pondName.isNotBlank() || state.species.isNotBlank() || state.stockCount.isNotBlank()) {
-                    AppButton(
-                        text = "Save Configuration",
-                        onClick = viewModel::savePondConfig,
-                        enabled = !state.isSaving,
-                        isLoading = state.isSaving,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                // Pond Management Section
+                SectionHeader(title = "Pond Management")
+
+                AppButton(
+                    text = "Manage Ponds",
+                    onClick = onNavigateToPondManagement,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+
 
                 // Error message
                 if (state.error != null) {
@@ -299,38 +267,12 @@ fun SettingsScreen(
             }
         }
 
-        // Date Picker Dialog
-        if (state.showDatePicker) {
-            val datePickerState = rememberDatePickerState(
-                initialSelectedDateMillis = state.startDate
-                    ?.atTime(12, 0)
-                    ?.atZone(ZoneId.systemDefault())
-                    ?.toInstant()
-                    ?.toEpochMilli()
-            )
-
-            DatePickerDialog(
-                onDismissRequest = viewModel::dismissDatePicker,
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            datePickerState.selectedDateMillis?.let { millis ->
-                                viewModel.onStartDateChanged(millis)
-                            }
-                            viewModel.dismissDatePicker()
-                        }
-                    ) {
-                        Text("OK")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = viewModel::dismissDatePicker) {
-                        Text("Cancel")
-                    }
-                }
-            ) {
-                DatePicker(state = datePickerState)
-            }
-        }
+        // Snackbar host
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        )
     }
 }

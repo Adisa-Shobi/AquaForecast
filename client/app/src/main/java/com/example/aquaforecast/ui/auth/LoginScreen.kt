@@ -23,6 +23,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.aquaforecast.ui.components.AppButton
+import com.example.aquaforecast.ui.components.AppIconButton
+import com.example.aquaforecast.ui.components.AppOutlinedButton
+import com.example.aquaforecast.ui.components.AppTextButton
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
@@ -137,18 +141,17 @@ fun LoginScreen(
                         )
                     },
                     trailingIcon = {
-                        IconButton(onClick = authViewModel::togglePasswordVisibility) {
-                            Icon(
-                                imageVector = if (state.value.isPasswordVisible)
-                                    Icons.Default.Visibility
-                                else
-                                    Icons.Default.VisibilityOff,
-                                contentDescription = if (state.value.isPasswordVisible)
-                                    "Hide password"
-                                else
-                                    "Show password"
-                            )
-                        }
+                        AppIconButton(
+                            icon = if (state.value.isPasswordVisible)
+                                Icons.Default.Visibility
+                            else
+                                Icons.Default.VisibilityOff,
+                            onClick = authViewModel::togglePasswordVisibility,
+                            contentDescription = if (state.value.isPasswordVisible)
+                                "Hide password"
+                            else
+                                "Show password"
+                        )
                     },
                     visualTransformation = if (state.value.isPasswordVisible)
                         VisualTransformation.None
@@ -178,7 +181,8 @@ fun LoginScreen(
                 )
 
                 // Login/Register button
-                Button(
+                AppButton(
+                    text = if (state.value.isLoginMode) "Sign In" else "Register",
                     onClick = {
                         focusManager.clearFocus()
                         if (state.value.isLoginMode) {
@@ -187,36 +191,20 @@ fun LoginScreen(
                             authViewModel.registerWithEmail()
                         }
                     },
+                    modifier = Modifier.fillMaxWidth(),
                     enabled = !state.value.isLoading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                ) {
-                    if (state.value.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    } else {
-                        Text(
-                            text = if (state.value.isLoginMode) "Sign In" else "Register",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
+                    isLoading = state.value.isLoading
+                )
 
                 // Switch mode button
-                TextButton(
+                AppTextButton(
+                    text = if (state.value.isLoginMode)
+                        "Don't have an account? Register"
+                    else
+                        "Already have an account? Sign In",
                     onClick = authViewModel::switchMode,
                     enabled = !state.value.isLoading
-                ) {
-                    Text(
-                        text = if (state.value.isLoginMode)
-                            "Don't have an account? Register"
-                        else
-                            "Already have an account? Sign In"
-                    )
-                }
+                )
 
                 // Divider
                 Row(
@@ -234,30 +222,12 @@ fun LoginScreen(
                 }
 
                 // Google Sign-In button with Credential Manager
-                OutlinedButton(
+                AppOutlinedButton(
+                    text = "Continue with Google",
                     onClick = { launchGoogleSignIn() },
                     enabled = !state.value.isLoading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Google icon (ideally use proper Google logo drawable)
-                        Text(
-                            text = "G",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Continue with Google",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 // Error message
                 if (state.value.error != null) {

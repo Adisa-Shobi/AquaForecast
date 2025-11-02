@@ -1,33 +1,41 @@
 package com.example.aquaforecast.data.remote
 
-import com.example.aquaforecast.data.remote.dto.FarmDataDto
+import com.example.aquaforecast.data.remote.dto.FarmDataSyncRequest
 import com.example.aquaforecast.data.remote.dto.ModelVersionResponse
 import com.example.aquaforecast.data.remote.dto.SyncResponse
-import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
-import retrofit2.http.Streaming
+import retrofit2.http.Query
 
 interface ApiService {
 
     /**
-     * Upload farm data to backend
+     * Sync farm data to backend
+     * POST /api/v1/farm-data/sync
      */
     @POST("api/v1/farm-data/sync")
-    suspend fun syncFarmData(@Body data: List<FarmDataDto>): Response<SyncResponse>
+    suspend fun syncFarmData(
+        @Header("Authorization") authToken: String,
+        @Body request: FarmDataSyncRequest
+    ): Response<SyncResponse>
 
     /**
-     * Check latest model version
+     * Get latest ML model version
+     * GET /api/v1/models/latest
      */
-    @GET("api/v1/model/version")
-    suspend fun checkModelVersion(): Response<ModelVersionResponse>
+    @GET("api/v1/models/latest")
+    suspend fun getLatestModel(): Response<ModelVersionResponse>
 
     /**
-     * Download ML model file
+     * Check for model update
+     * GET /api/v1/models/check-update
      */
-    @Streaming
-    @GET("api/v1/model/download")
-    suspend fun downloadModel(): Response<ResponseBody>
+    @GET("api/v1/models/check-update")
+    suspend fun checkModelUpdate(
+        @Query("current_version") currentVersion: String,
+        @Query("app_version") appVersion: String? = null
+    ): Response<ModelVersionResponse>
 }

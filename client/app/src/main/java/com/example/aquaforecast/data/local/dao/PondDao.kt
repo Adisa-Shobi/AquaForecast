@@ -12,6 +12,13 @@ import kotlinx.coroutines.flow.Flow
 interface PondDao {
 
     /**
+     * Get all ponds
+     * Returns list of all ponds ordered by creation date
+     */
+    @Query("SELECT * FROM pond ORDER BY created_at DESC")
+    suspend fun getAllPonds(): List<PondEntity>
+
+    /**
      * Get the current pond configuration
      * Returns null if no pond is configured
      */
@@ -102,4 +109,16 @@ interface PondDao {
      */
     @Query("SELECT species FROM pond LIMIT 1")
     suspend fun getPondSpecies(): String?
+
+    /**
+     * Get pond by ID (String version for compatibility)
+     * Converts string ID to long and fetches pond
+     */
+    suspend fun getPondById(pondId: String): PondEntity? {
+        return try {
+            getPondById(pondId.toLong())
+        } catch (e: NumberFormatException) {
+            null
+        }
+    }
 }

@@ -1,5 +1,6 @@
 package com.example.aquaforecast.ui.dataentry
 
+import com.example.aquaforecast.domain.model.Pond
 import com.example.aquaforecast.domain.model.WaterQualityStatus
 
 /**
@@ -25,6 +26,9 @@ data class EntryState(
     // Pond info
     val pondId: String? = null,
     val pondName: String? = null,
+    val availablePonds: List<Pond> = emptyList(),
+    val selectedPond: Pond? = null,
+    val isPondDropdownExpanded: Boolean = false,
 
     // UI state
     val isLoading: Boolean = false,
@@ -32,6 +36,10 @@ data class EntryState(
     val isRefreshing: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null,
+
+    // Dialog states
+    val showReportDeathDialog: Boolean = false,
+    val showHarvestDialog: Boolean = false,
 
     // Validation
     val canSave: Boolean = false

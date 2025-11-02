@@ -24,4 +24,7 @@ interface PredictionDao {
 
     @Query("DELETE FROM prediction WHERE createdAt < :timestamp")
     suspend fun deleteOlderThan(timestamp: Long): Int
+
+    @Query("SELECT * FROM prediction WHERE farmDataId = :farmDataId LIMIT 1")
+    suspend fun getPredictionByFarmDataId(farmDataId: Long): PredictionEntity?
 }

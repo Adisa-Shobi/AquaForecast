@@ -1,7 +1,7 @@
 package com.example.aquaforecast.data.ml
 
 import android.content.Context
-import com.example.aquaforecast.data.preferences.PreferencesManager
+import android.util.Log
 import com.example.aquaforecast.domain.model.FarmData
 import com.example.aquaforecast.domain.model.Pond
 import com.example.aquaforecast.domain.model.Prediction
@@ -16,12 +16,13 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import java.util.concurrent.TimeUnit
 
+private const val TAG = "MLPredictor"
+
 
  // ML Predictor for fish growth forecasting using TensorFlow Lite
 class MLPredictor(
     private val context: Context,
-    private val farmDataRepository: FarmDataRepository,
-    private val preferencesManager: PreferencesManager
+    private val farmDataRepository: FarmDataRepository
 ) {
     private var interpreter: Interpreter? = null
     private val featurePreprocessor = FeaturePreprocessor(context)
@@ -32,9 +33,6 @@ class MLPredictor(
         // Model output indices
         private const val OUTPUT_WEIGHT_INDEX = 0
         private const val OUTPUT_LENGTH_INDEX = 1
-
-        // Expected model configuration
-//        private const val INPUT_SIZE = FeaturePreprocessor.TOTAL_FEATURES
         private const val OUTPUT_SIZE = 2 // weight and length predictions
 
         // Default weights for harvest readiness (in kg)
@@ -49,7 +47,8 @@ class MLPredictor(
     suspend fun initialize(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val modelBuffer = loadModelFile()
-            interpreter = Interpreter(modelBuffer)
+            val options = Interpreter.Options()
+            interpreter = Interpreter(modelBuffer, options)
             Result.Success(Unit)
         } catch (e: Exception) {
             Result.Error("Failed to initialize ML model: ${e.message}")
@@ -86,9 +85,21 @@ class MLPredictor(
             val features = featurePreprocessor.prepareFeatures(
                 latestData = latestData,
                 historicalData = historicalData,
-                pond = pond,
-                fishWeight = null // Can be provided if available from user input
+                pond = pond
             )
+
+            Log.d(TAG, "========== PREDICTION INPUT ==========")
+            Log.d(TAG, "Pond: ${pond.name} (ID: ${pond.id}, Species: ${pond.species})")
+            Log.d(TAG, "Stock Count: ${pond.stockCount}")
+            Log.d(TAG, "Latest Data:")
+            Log.d(TAG, "  - Temperature: ${latestData.temperature}°C")
+            Log.d(TAG, "  - pH: ${latestData.ph}")
+            Log.d(TAG, "  - Dissolved Oxygen: ${latestData.dissolvedOxygen} mg/L")
+            Log.d(TAG, "  - Ammonia: ${latestData.ammonia} ppm")
+            Log.d(TAG, "  - Nitrate: ${latestData.nitrate} ppm")
+            Log.d(TAG, "  - Turbidity: ${latestData.turbidity} NTU")
+            Log.d(TAG, "Historical Data Points: ${historicalData.size}")
+            Log.d(TAG, "Preprocessed Features (scaled): ${features.contentToString()}")
 
             // Run inference
             val outputs = runInference(features)
@@ -100,6 +111,11 @@ class MLPredictor(
 
             // Convert weight from grams to kg for internal use
             val predictedWeight = predictedWeightGrams / 1000.0
+
+            Log.d(TAG, "========== PREDICTION OUTPUT ==========")
+            Log.d(TAG, "Model Output:")
+            Log.d(TAG, "  - Weight: ${predictedWeightGrams}g (${predictedWeight}kg)")
+            Log.d(TAG, "  - Length: ${predictedLength}cm")
 
             // Calculate harvest date based on predicted weight
             val harvestDate = calculateHarvestDate(
@@ -171,7 +187,7 @@ class MLPredictor(
         val targetWeight = when (pond.species.name) {
             "TILAPIA" -> TILAPIA_HARVEST_WEIGHT
             "CATFISH" -> CATFISH_HARVEST_WEIGHT
-            else -> TILAPIA_HARVEST_WEIGHT
+            else -> CATFISH_HARVEST_WEIGHT
         }
 
         // If already at harvest weight, return current date
@@ -182,7 +198,7 @@ class MLPredictor(
         // Estimate days until harvest based on growth rate
         // This is a simplified calculation - adjust based on your model's predictions
         val weightDeficit = targetWeight - currentWeight
-        val growthRatePerDay = 0.01 // 10g per day (example rate)
+        val growthRatePerDay = 0.01 // TODO: Find a scientifically backed way to calculate this
         val daysUntilHarvest = (weightDeficit / growthRatePerDay).toLong()
 
         return latestData.timestamp + TimeUnit.DAYS.toMillis(daysUntilHarvest)
@@ -195,6 +211,7 @@ class MLPredictor(
      * @param historicalData Historical farm data
      * @return Confidence score (0.0 - 1.0)
      */
+    // TODO: Improve the algorithm
     private fun calculateConfidence(
         predictedWeight: Double,
         historicalData: List<FarmData>
