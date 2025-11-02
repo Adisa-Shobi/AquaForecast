@@ -1,5 +1,6 @@
 package com.example.aquaforecast.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -9,7 +10,10 @@ data class PondEntity(
     val id: Long = 0,
     val name: String,
     val species: String,
+    @ColumnInfo(name = "stock_count")
     val stockCount: Int,
+    @ColumnInfo(name = "start_date")
     val startDate: Long,
-    val createdAt: Long
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long = System.currentTimeMillis()
 )

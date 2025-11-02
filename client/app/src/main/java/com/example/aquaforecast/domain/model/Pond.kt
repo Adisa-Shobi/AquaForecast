@@ -1,6 +1,10 @@
 package com.example.aquaforecast.domain.model
+
 import kotlinx.serialization.Serializable
-import java.util.concurrent.TimeUnit
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 @Serializable
 data class Pond(
@@ -8,27 +12,33 @@ data class Pond(
     val name: String,
     val species: Species,
     val stockCount: Int,
-    val startDate: Long,
+    @Serializable(with = LocalDateSerializer::class)
+    val startDate: LocalDate,
     val createdAt: Long = System.currentTimeMillis()
 ) {
     val daysInOperation: Int
         get() {
-            val diff = System.currentTimeMillis() - startDate
-            return TimeUnit.MILLISECONDS.toDays(diff).toInt()
+            return ChronoUnit.DAYS.between(startDate, LocalDate.now()).toInt()
         }
 
     fun getFormattedStartDate(): String {
-        val date = java.util.Date(startDate)
-        val format = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
-        return format.format(date)
+        val formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
+        return startDate.format(formatter)
     }
 
-    fun getExpectedHarvestDate(): Long {
+    fun getExpectedHarvestDate(): LocalDate {
         val growthPeriodDays = when (species) {
-            Species.TILAPIA -> 180  // ~6 months
-            Species.CATFISH -> 150  // ~5 months
+            Species.TILAPIA -> 180L
+            Species.CATFISH -> 150L
         }
-        return startDate + TimeUnit.DAYS.toMillis(growthPeriodDays.toLong())
+        return startDate.plusDays(growthPeriodDays)
+    }
+
+    fun getExpectedHarvestDateMillis(): Long {
+        return getExpectedHarvestDate()
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
     }
 }
 

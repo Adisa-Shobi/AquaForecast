@@ -1,6 +1,7 @@
 package com.example.aquaforecast.ui.auth
 
 import android.content.Context
+import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aquaforecast.domain.repository.AuthRepository

@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.aquaforecast.domain.repository.AuthRepository
 import com.example.aquaforecast.ui.auth.AuthViewModel
 import com.example.aquaforecast.ui.auth.LoginScreen
+import com.example.aquaforecast.ui.main.MainScreen
 import com.example.aquaforecast.ui.splash.SplashScreen
 import com.google.firebase.auth.FirebaseAuth
 import org.koin.compose.koinInject
@@ -25,17 +27,18 @@ import org.koin.compose.koinInject
 @Composable
 fun Navigation() {
     val navController = rememberNavController()
+    val authRepository: AuthRepository = koinInject()
+    val authState = authRepository.observeAuthState().collectAsState(initial = null)
 
     NavHost(navController = navController, Screen.Splash.route) {
         composable(route = Screen.Login.route) {
-            val authViewModel: AuthViewModel = koinInject()
             LoginScreen({
-                navController.navigate(Screen.Prediction.route) {
+                navController.navigate(Screen.Main.route) {
                     popUpTo(Screen.Login.route) {
                         inclusive=true
                     }
                 }
-            }, authViewModel)
+            })
         }
         composable(route = Screen.Splash.route) {
             SplashScreen({
@@ -45,30 +48,24 @@ fun Navigation() {
                     }
                 }
             }, {
-                navController.navigate( Screen.Prediction.route) {
+                navController.navigate( Screen.Main.route) {
                     popUpTo(Screen.Splash.route) {
                         inclusive=true
                     }
                 }
             })
         }
-        composable(route = Screen.Prediction.route) {
-            PredictionScreen()
-        }
-    }
-}
+        composable(route = Screen.Main.route) {
 
-@Composable
-fun PredictionScreen () {
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Column (
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Prediction Screen",
-                modifier = Modifier.padding(innerPadding)
-            )
+            LaunchedEffect(authState.value) {
+                if (authState.value == null) {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) {inclusive = true}
+                    }
+                }
+            }
+
+            MainScreen()
         }
     }
 }
