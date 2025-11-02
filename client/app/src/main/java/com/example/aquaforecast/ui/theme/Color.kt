@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Color
 
 // Primary Colors - Blue for water/aquaculture theme
 val Primary = Color(0xFF2563EB) // Bright blue
-val OnPrimary = Color(0xFFFFFFFF)
+val OnPrimary = Color(0xFFFFFFFF) // White text on primary buttons
 val PrimaryContainer = Color(0xFFDEEBFF)
 val OnPrimaryContainer = Color(0xFF001C38)
 

@@ -11,6 +11,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 
+private const val TAG = "SplashScreen"
+
 /**
  * Splash screen that checks authentication status
  * and navigates to appropriate screen
