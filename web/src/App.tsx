@@ -6,7 +6,7 @@ import Dashboard from './pages/Dashboard';
 import ModelDetails from './pages/ModelDetails';
 import RetrainModel from './pages/RetrainModel';
 import DeployModel from './pages/DeployModel';
-import { Waves, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -26,9 +26,11 @@ function Layout({ children }: { children: React.ReactNode }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to="/" className="flex items-center gap-3">
-              <div className="bg-blue-600 p-2 rounded-lg">
-                <Waves className="text-white" size={24} />
-              </div>
+              <img
+                src="/logo.png"
+                alt="AquaForecast Logo"
+                className="w-10 h-10 rounded-lg"
+              />
               <div>
                 <h1 className="text-xl font-bold text-gray-900">AquaForecast</h1>
                 <p className="text-xs text-gray-500">Model Management</p>
