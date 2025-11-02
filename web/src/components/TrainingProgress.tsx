@@ -59,7 +59,8 @@ export default function TrainingProgress() {
       }
 
       // Create SSE connection with Authorization header (secure!)
-      const url = `/api/v1/models/training/tasks/stream`;
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+      const url = `${apiBaseUrl}/models/training/tasks/stream`;
       const eventSource = new EventSourceWithHeaders(url, {
         'Authorization': `Bearer ${token}`,
       });
