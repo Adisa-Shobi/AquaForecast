@@ -11,7 +11,7 @@ interface FarmDataDao {
     suspend fun insert(farmData: FarmDataEntity): Long
 
     @Query("SELECT * FROM farm_data ORDER BY timestamp DESC")
-    fun getAll(): Flow<List<FarmDataEntity>>
+    fun getAll(): List<FarmDataEntity>
 
     @Query("SELECT * FROM farm_data WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp DESC")
     suspend fun getByDateRange(start: Long, end: Long): List<FarmDataEntity>
