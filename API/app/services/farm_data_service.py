@@ -25,6 +25,15 @@ class FarmDataService:
         # Create WKT point for PostGIS
         point_wkt = f"POINT({reading.location.longitude} {reading.location.latitude})"
 
+        # Parse start_date from string to date object if provided
+        start_date_obj = None
+        if reading.start_date:
+            try:
+                start_date_obj = datetime.fromisoformat(reading.start_date).date()
+            except (ValueError, AttributeError):
+                # If parsing fails, leave as None
+                pass
+
         farm_data = FarmData(
             user_id=user_id,
             temperature=reading.temperature,
@@ -33,6 +42,10 @@ class FarmDataService:
             ammonia=reading.ammonia,
             nitrate=reading.nitrate,
             turbidity=reading.turbidity,
+            fish_weight=reading.fish_weight,
+            fish_length=reading.fish_length,
+            verified=reading.verified,
+            start_date=start_date_obj,
             location=point_wkt,
             country_code=reading.country_code,
             recorded_at=reading.recorded_at,
@@ -54,24 +67,92 @@ class FarmDataService:
         readings: List[FarmDataReading],
         device_id: Optional[str] = None,
     ) -> Tuple[List[FarmData], int]:
-        """Bulk create farm data readings."""
+        """
+        Bulk create farm data readings using batch insert for performance.
+
+        Uses SQLAlchemy bulk_insert_mappings for significant performance improvement
+        over individual inserts (10-100x faster for large batches).
+        """
         created_readings = []
         failed_count = 0
+        current_time = datetime.utcnow()
 
+        # Prepare batch data for bulk insert
+        bulk_data = []
         for reading in readings:
             try:
-                farm_data = FarmDataService.create_reading(
-                    db, user_id, reading, device_id
-                )
-                created_readings.append(farm_data)
+                # Create WKT point for PostGIS
+                point_wkt = f"POINT({reading.location.longitude} {reading.location.latitude})"
+
+                # Parse start_date from string to date object if provided
+                start_date_obj = None
+                if reading.start_date:
+                    try:
+                        start_date_obj = datetime.fromisoformat(reading.start_date).date()
+                    except (ValueError, AttributeError):
+                        pass
+
+                # Prepare data dictionary for bulk insert
+                bulk_data.append({
+                    'user_id': user_id,
+                    'temperature': reading.temperature,
+                    'ph': reading.ph,
+                    'dissolved_oxygen': reading.dissolved_oxygen,
+                    'ammonia': reading.ammonia,
+                    'nitrate': reading.nitrate,
+                    'turbidity': reading.turbidity,
+                    'fish_weight': reading.fish_weight,
+                    'fish_length': reading.fish_length,
+                    'verified': reading.verified,
+                    'start_date': start_date_obj,
+                    'location': point_wkt,
+                    'country_code': reading.country_code,
+                    'recorded_at': reading.recorded_at,
+                    'synced_at': current_time,
+                    'device_id': device_id,
+                    'created_at': current_time,
+                })
             except Exception as e:
                 failed_count += 1
                 continue
 
+        # Perform batch insert if we have valid data
+        if bulk_data:
+            try:
+                # Use bulk_insert_mappings for efficient batch insert
+                # This performs a single INSERT statement for all records
+                db.bulk_insert_mappings(FarmData, bulk_data, return_defaults=False)
+                db.commit()
+
+                # Query the inserted records to return them
+                # We query by user_id and synced_at to get the batch we just inserted
+                created_readings = db.query(FarmData).filter(
+                    FarmData.user_id == user_id,
+                    FarmData.synced_at == current_time
+                ).all()
+
+            except Exception as e:
+                db.rollback()
+                # If batch insert fails, fall back to individual inserts
+                import logging
+                logging.error(f"Batch insert failed, falling back to individual inserts: {e}")
+
+                for reading_data in bulk_data:
+                    try:
+                        farm_data = FarmData(**reading_data)
+                        db.add(farm_data)
+                        db.commit()
+                        db.refresh(farm_data)
+                        created_readings.append(farm_data)
+                    except Exception:
+                        failed_count += 1
+                        db.rollback()
+                        continue
+
         # Update user's last sync time
         user = db.query(User).filter(User.id == user_id).first()
         if user:
-            user.last_sync_at = datetime.utcnow()
+            user.last_sync_at = current_time
             db.commit()
 
         return created_readings, failed_count

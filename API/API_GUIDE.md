@@ -1,10 +1,10 @@
-# AquaForecast API - Complete Guide
+# AquaForecast API Guide
 
 ## Overview
 
-Privacy-first REST API for aquaculture water quality data collection and analytics. Built with FastAPI, PostgreSQL+PostGIS, and Firebase Authentication.
+Privacy-first REST API for aquaculture water quality data collection and ML model management. Built with FastAPI, PostgreSQL+PostGIS, and Firebase Authentication.
 
-**Privacy Promise**: Only stores water quality parameters and location data with user consent. All predictions, feeding schedules, and pond configurations remain local on user devices.
+**Privacy Promise**: Only stores water quality parameters and location data. Predictions and pond configurations remain local on user devices.
 
 ## Quick Start
 
@@ -55,486 +55,164 @@ uvicorn app.main:app --reload
 
 ## API Endpoints
 
+> **Full API documentation available at**: `http://localhost:8000/docs` (interactive OpenAPI/Swagger UI)
+
 ### Authentication
 
-**POST /api/v1/auth/register**
-- Register or verify user after Firebase authentication
-- Headers: `Authorization: Bearer <firebase_token>`
-- Body: `{"firebase_uid": "...", "email": "..."}`
-- Returns: User info (user_id, email, created_at)
+All protected endpoints require: `Authorization: Bearer <firebase_token>`
 
-**GET /api/v1/auth/me**
-- Get current user profile
-- Headers: `Authorization: Bearer <firebase_token>`
-- Returns: User profile with reading count
+**POST /api/v1/auth/register** - Register user after Firebase authentication
+**GET /api/v1/auth/me** - Get current user profile
 
 ### Farm Data
 
-**POST /api/v1/farm-data/sync**
-- Bulk sync water quality readings with fish measurements (max 100 per request)
-- Headers: `Authorization: Bearer <firebase_token>`
-- Body:
-```json
-{
-  "device_id": "optional-device-id",
-  "readings": [
-    {
-      "temperature": 28.5,
-      "ph": 7.2,
-      "dissolved_oxygen": 6.8,
-      "ammonia": 0.15,
-      "nitrate": 10.5,
-      "turbidity": 12.3,
-      "fish_weight": 0.850,
-      "fish_length": 25.5,
-      "verified": true,
-      "start_date": "2025-01-01",
-      "location": {"latitude": -1.2921, "longitude": 36.8219},
-      "country_code": "KE",
-      "recorded_at": "2025-01-15T08:00:00Z"
-    }
-  ]
-}
-```
-- **Note**: `fish_weight` (kg), `fish_length` (cm), `verified`, and `start_date` are optional
-- Returns: Sync summary with synced_count, failed_count
+**POST /api/v1/farm-data/sync** - Bulk sync water quality readings (max 100 per request)
+**GET /api/v1/farm-data** - Get historical readings with pagination
+**GET /api/v1/farm-data/analytics** - Regional analytics and statistics
+**DELETE /api/v1/farm-data/user** - Delete all user data (GDPR compliance)
 
-**GET /api/v1/farm-data**
-- Get user's historical readings
-- Query params: `start_date`, `end_date`, `limit` (default 100), `offset`
-- Returns: Paginated list of readings
+### ML Model Management
 
-**GET /api/v1/farm-data/analytics**
-- Get aggregated analytics by region
-- Query params: `region` (country code), `start_date`, `end_date`
-- Returns: Regional averages and statistics
+#### Public (No Auth)
+**GET /api/v1/models/latest** - Get latest model version
+**GET /api/v1/models/deployed** - Get production model
+**GET /api/v1/models/check-update** - Check for model updates
 
-**DELETE /api/v1/farm-data/user**
-- Delete all user's farm data (GDPR compliance)
-- Returns: Count of deleted records
-
-### ML Model Distribution
-
-**GET /api/v1/models/latest**
-- Get latest active ML model version
-- No authentication required
-- Returns: Model info (version, download URL, size, preprocessing config)
-
-**GET /api/v1/models/check-update**
-- Check if newer model version available
-- Query params: `current_version` (required), `app_version` (optional)
-- Returns: Update status, latest version info if available
+#### Authenticated
+**GET /api/v1/models/list** - List all models with metrics
+**GET /api/v1/models/{model_id}/metrics** - Detailed model metrics
+**POST /api/v1/models/retrain** - Train new model from base model
+**POST /api/v1/models/deploy** - Deploy model to production
+**DELETE /api/v1/models/{model_id}/archive** - Archive model
 
 ### Health Check
 
-**GET /health**
-- Check API status (no auth required)
-- Returns: `{"status": "healthy", "version": "1.0.0"}`
-
-## Database Schema
-
-### Users Table
-```sql
-CREATE TABLE users (
-    id UUID PRIMARY KEY,
-    firebase_uid VARCHAR(128) UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    created_at TIMESTAMP NOT NULL,
-    last_sync_at TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE
-);
-```
-
-### Model Versions Table
-```sql
-CREATE TABLE model_versions (
-    id UUID PRIMARY KEY,
-    version VARCHAR(50) UNIQUE NOT NULL,
-    model_url TEXT NOT NULL,
-    model_size_bytes BIGINT,
-    preprocessing_config JSONB,
-    is_active BOOLEAN DEFAULT TRUE,
-    min_app_version VARCHAR(20),
-    created_at TIMESTAMP NOT NULL
-);
-```
-
-### Farm Data Table
-```sql
-CREATE TABLE farm_data (
-    id UUID PRIMARY KEY,
-    user_id UUID REFERENCES users(id),
-    temperature DECIMAL(5, 2) NOT NULL,
-    ph DECIMAL(4, 2) NOT NULL,
-    dissolved_oxygen DECIMAL(5, 2) NOT NULL,
-    ammonia DECIMAL(5, 2) NOT NULL,
-    nitrate DECIMAL(5, 2) NOT NULL,
-    turbidity DECIMAL(6, 2) NOT NULL,
-    fish_weight DECIMAL(8, 3),
-    fish_length DECIMAL(6, 2),
-    verified BOOLEAN DEFAULT FALSE NOT NULL,
-    start_date DATE,
-    location GEOGRAPHY(POINT, 4326) NOT NULL,
-    country_code VARCHAR(2),
-    recorded_at TIMESTAMP NOT NULL,
-    synced_at TIMESTAMP NOT NULL,
-    device_id VARCHAR(255),
-    created_at TIMESTAMP NOT NULL
-);
-```
+**GET /health** - API status (no auth required)
 
 ## Architecture
 
-### Project Structure
 ```
 API/
 ├── app/
-│   ├── main.py                    # FastAPI application
-│   ├── core/                      # Config, database, security
-│   ├── models/                    # SQLAlchemy ORM models
-│   ├── schemas/                   # Pydantic validation
-│   ├── services/                  # Business logic
-│   ├── api/v1/endpoints/          # Route handlers
-│   └── middleware/                # Error handling
-├── alembic/                       # Database migrations
-├── tests/                         # Test suite
-├── requirements.txt
-├── Dockerfile
-└── docker-compose.yml
+│   ├── main.py           # FastAPI application
+│   ├── core/             # Config, database, security
+│   ├── models/           # SQLAlchemy ORM models
+│   ├── schemas/          # Pydantic validation
+│   ├── services/         # Business logic
+│   └── api/v1/endpoints/ # Route handlers
+├── alembic/              # Database migrations
+└── requirements.txt
 ```
 
-### Clean Architecture Layers
+**Database**: PostgreSQL with PostGIS for spatial data
+**Authentication**: Firebase ID tokens
+**ML Storage**: Cloudinary CDN
 
-1. **Core** - Infrastructure (config, database, security)
-2. **Models** - Database tables (SQLAlchemy ORM)
-3. **Schemas** - API validation (Pydantic)
-4. **Services** - Business logic
-5. **API** - HTTP handlers
-6. **Middleware** - Cross-cutting concerns
+## ML Model Management
 
-### Request Flow
+The API supports continuous model improvement through automated retraining:
+
+### Key Features
+- **Version tracking** with parent-child relationships (semantic versioning)
+- **Metrics**: R², RMSE, MAE tracked per model
+- **Data integrity**: Training data tracked to prevent reuse
+- **Cloud storage**: Models stored on Cloudinary CDN (TFLite + Keras)
+- **One-click deployment**: Only one production model at a time
+
+### Model Lifecycle
 ```
-Client Request
-    ↓
-FastAPI Router
-    ↓
-Authentication Middleware (Firebase token validation)
-    ↓
-Pydantic Validation
-    ↓
-Endpoint Handler
-    ↓
-Service Layer (business logic)
-    ↓
-Database (SQLAlchemy)
-    ↓
-Response Serialization
-    ↓
-Client Response
+TRAINING → COMPLETED → DEPLOYED → ARCHIVED
 ```
+
+### Training Workflow
+1. **Select base model**: Use `/models/list` to find best model
+2. **Initiate retraining**: `POST /models/retrain` with base_model_id and new version
+3. **Monitor progress**: Training runs in background
+4. **Review metrics**: Check R² score and errors
+5. **Deploy**: `POST /models/deploy` if metrics improved
+
+### Best Practices
+- Retrain when 500+ new verified samples accumulated
+- Only deploy if R² improvement ≥ 1%
+- Use semantic versioning (e.g., 1.2.0)
+- Document changes in notes field
+
+**Note**: Model architecture and features detailed in training notebook
 
 ## Configuration
 
-### Environment Variables (.env)
+### Environment Variables
 
-**IMPORTANT**: Create a `.env` file (never commit to git) with your secrets:
+Create a `.env` file (see `.env.example`):
 
 ```bash
-# Environment
-ENVIRONMENT=development
-
-# Database (Remote - KEEP SECRET!)
-DATABASE_URL=postgresql://user:password@your-db-host.com:5432/aquaforecast
-
-# Firebase
+DATABASE_URL=postgresql://user:password@host:5432/aquaforecast
 FIREBASE_CREDENTIALS_PATH=./firebase-credentials.json
-
-# API
-API_V1_PREFIX=/api/v1
-PROJECT_NAME=AquaForecast API
-VERSION=1.0.0
-
-# CORS
-CORS_ORIGINS=http://localhost:3000
-
-# Logging
-LOG_LEVEL=INFO
-
-# Server
-HOST=0.0.0.0
-PORT=8000
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+CORS_ORIGINS=http://localhost:3000,https://your-frontend.vercel.app
 ```
 
-### Getting Firebase Credentials
-
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Select your project
-3. Project Settings → Service Accounts
-4. Generate new private key
-5. Save as `firebase-credentials.json` in API directory
-
-## Authentication
-
-All protected endpoints require Firebase ID token in Authorization header:
-
-```
-Authorization: Bearer <firebase_id_token>
-```
+Get Firebase credentials: Firebase Console → Project Settings → Service Accounts → Generate Key
 
 ## Data Validation
 
-### Water Quality Parameters
-- **temperature**: 0-50°C (2 decimal places)
-- **ph**: 0-14 (2 decimal places)
-- **dissolved_oxygen**: 0-20 mg/L (2 decimal places)
-- **ammonia**: 0-10 mg/L (2 decimal places)
-- **nitrate**: 0-100 mg/L (2 decimal places)
-- **turbidity**: 0-1000 NTU (2 decimal places)
+### Water Quality (Required)
+- temperature: 0-50°C
+- ph: 0-14
+- dissolved_oxygen: 0-20 mg/L
+- ammonia: 0-10 mg/L
+- nitrate: 0-100 mg/L
+- turbidity: 0-1000 NTU
 
 ### Fish Measurements (Optional)
-- **fish_weight**: 0-100 kg (3 decimal places, e.g., 0.850)
-- **fish_length**: 0-500 cm (2 decimal places, e.g., 25.50)
-- **verified**: boolean (true/false) - indicates user confirmed measurements are accurate
-- **start_date**: Date in YYYY-MM-DD format - pond cycle start date
-
-### Location Data
-- **latitude**: -90 to 90 (6 decimal places)
-- **longitude**: -180 to 180 (6 decimal places)
-- **country_code**: 2-letter ISO code (optional)
-
-## Error Handling
-
-### Response Format
-
-**Success:**
-```json
-{
-  "success": true,
-  "data": { /* response data */ },
-  "meta": { /* optional metadata */ }
-}
-```
-
-**Error:**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable message",
-    "details": { /* optional */ }
-  }
-}
-```
-
-### Error Codes
-- **AUTH_001**: Invalid or expired token
-- **VALIDATION_001**: Invalid request data
-- **RESOURCE_001**: Resource not found
-- **DATABASE_001**: Database operation failed
-
-### HTTP Status Codes
-- **200 OK**: Success
-- **201 Created**: Resource created
-- **204 No Content**: Success, no response body
-- **400 Bad Request**: Invalid input
-- **401 Unauthorized**: Missing/invalid auth
-- **403 Forbidden**: Not authorized
-- **404 Not Found**: Resource not found
-- **422 Unprocessable Entity**: Validation error
-- **500 Internal Server Error**: Server error
-
-## Testing
-
-### Run Tests
-```bash
-# All tests
-pytest
-
-# With coverage
-pytest --cov=app tests/
-
-# Specific test file
-pytest tests/test_auth.py -v
-```
-
-### Test Structure
-- `tests/conftest.py` - Fixtures and test setup
-- `tests/test_auth.py` - Authentication tests
-- `tests/test_farm_data.py` - Farm data tests
+- fish_weight: 0-100 kg
+- fish_length: 0-500 cm
+- verified: boolean (for training data quality)
+- start_date: YYYY-MM-DD (pond cycle start)
 
 ## Database Migrations
 
-### Create Migration
 ```bash
-alembic revision --autogenerate -m "Description"
-```
-
-### Apply Migrations
-```bash
-alembic upgrade head
-```
-
-### Rollback
-```bash
-alembic downgrade -1
-```
-
-### View History
-```bash
-alembic history
+alembic upgrade head              # Apply migrations
+alembic revision --autogenerate   # Create new migration
+alembic downgrade -1              # Rollback one version
 ```
 
 ## Deployment
 
-### Using Docker
-
 ```bash
-# Ensure .env file has your remote DATABASE_URL
-# Build and run
+# Docker (recommended)
 docker-compose up -d
 
-# Or build and run manually:
-docker build -t aquaforecast-api:v1 .
-docker run -d \
-  --name aquaforecast-api \
-  -p 8000:8000 \
-  --env-file .env \
-  -v $(pwd)/firebase-credentials.json:/app/firebase-credentials.json:ro \
-  aquaforecast-api:v1
-```
+# View logs
+docker-compose logs -f api
 
-### Production Checklist
-- [ ] Set strong SECRET_KEY
-- [ ] Use production database
-- [ ] Enable HTTPS only
-- [ ] Configure CORS properly
-- [ ] Set up monitoring/logging
-- [ ] Configure rate limiting
-- [ ] Set up database backups
-- [ ] Use environment secrets (not .env file)
-
-## Security
-
-### Best Practices
-- All endpoints use HTTPS in production
-- Firebase tokens validated on every request
-- SQL injection protected (SQLAlchemy ORM)
-- Input validation with Pydantic
-- CORS configured for allowed origins
-- No sensitive data in logs
-- Database connection pooling
-
-# Monitoring
-
-### Health Check
-```bash
+# Health check
 curl http://localhost:8000/health
 ```
 
-### Logs
-Structured JSON logging for easy parsing. View logs:
-```bash
-# Docker
-docker-compose logs -f api
-
-# Local
-tail -f logs/api.log
-```
-
-## Troubleshooting
-
-### Database Connection Error
-```bash
-# Verify DATABASE_URL in .env points to your remote database
-# Test connection (replace with your DATABASE_URL):
-python -c "import psycopg2; psycopg2.connect('your-database-url'); print('✅ Connected')"
-```
-
-### Firebase Authentication Error
-```bash
-# Verify firebase-credentials.json exists
-ls -la firebase-credentials.json
-
-# Check FIREBASE_CREDENTIALS_PATH in .env
-```
-
-### Port Already in Use
-```bash
-# Find process
-lsof -i :8000
-
-# Kill process
-kill -9 <PID>
-
-# Or use different port
-uvicorn app.main:app --port 8001
-```
-
-### PostGIS Extension Missing
-```bash
-# Connect to your remote database and run:
-CREATE EXTENSION IF NOT EXISTS postgis;
-
-# Or use the enable_postgis.py script (if you still have it)
-```
-
-## Development
-
-### Code Style
-```bash
-# Format with black
-black app tests
-
-# Check with flake8
-flake8 app tests
-
-# Type checking
-mypy app
-```
-
-### Adding New Endpoints
-
-1. Create schema in `app/schemas/`
-2. Add service logic in `app/services/`
-3. Create endpoint in `app/api/v1/endpoints/`
-4. Register in `app/api/v1/router.py`
-5. Write tests in `tests/`
-
-### Database Changes
-
-1. Modify model in `app/models/`
-2. Generate migration: `alembic revision --autogenerate -m "..."`
-3. Review migration file
-4. Apply: `alembic upgrade head`
+### Production Checklist
+- Configure CORS for your frontend domains
+- Use strong SECRET_KEY
+- Enable HTTPS only
+- Set up database backups
+- Use environment secrets (not .env file in container)
 
 ## Technology Stack
 
-- **FastAPI 0.104+** - Modern async web framework
-- **PostgreSQL 14+** - Relational database
-- **PostGIS 3.3+** - Spatial database extension
-- **SQLAlchemy 2.0+** - ORM
-- **Alembic 1.12+** - Database migrations
-- **Pydantic v2** - Data validation
-- **Firebase Admin SDK** - Authentication
-- **Pytest** - Testing framework
-- **Uvicorn** - ASGI server
-
-## API Limits
-
-- Max readings per sync: 100
-- Max farm data query: 1000 records
-- Token expiry: 1 hour (Firebase default)
+- FastAPI 0.104+ (async web framework)
+- PostgreSQL 14+ with PostGIS (spatial data)
+- SQLAlchemy 2.0+ (ORM) + Alembic (migrations)
+- Firebase Admin SDK (authentication)
+- TensorFlow 2.15+ + scikit-learn (ML)
+- Cloudinary (model storage & CDN)
 
 ## Support
 
-- Interactive API docs: http://localhost:8000/docs
-- OpenAPI spec: http://localhost:8000/openapi.json
-- GitHub: [Project Repository]
-- Email: dev@aquaforecast.com
+**Interactive Docs**: http://localhost:8000/docs (OpenAPI/Swagger UI)
+**API Limits**: Max 100 readings per sync, 1000 per query
 
 ---
-
-**Version**: 1.0.0
-**Last Updated**: January 2025
-**License**: Proprietary
+**Version**: 1.0.0 | **Updated**: January 2025

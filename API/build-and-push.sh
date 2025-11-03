@@ -3,7 +3,8 @@
 set -e  # Exit on any error
 
 # Base image name
-IMAGE="registry.gitlab.com/adisa-shobi-group/adisa-shobi-project"
+# IMAGE="registry.gitlab.com/adisa-shobi-group/adisa-shobi-project"
+IMAGE="aquaforecast.azurecr.io/samples/api"
 
 # Generate timestamp: YYYYMMDD-HHMMSS
 TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
