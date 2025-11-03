@@ -18,10 +18,10 @@ class FarmDataRepositoryImpl(
     private val farmDataDao: FarmDataDao
 ) : FarmDataRepository {
 
-    override suspend fun save(farmData: FarmData): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun save(farmData: FarmData): Result<Long> = withContext(Dispatchers.IO) {
         try {
-            farmDataDao.insert(farmData.toEntity())
-            Unit.asSuccess()
+            val id = farmDataDao.insert(farmData.toEntity())
+            id.asSuccess()
         } catch (e: Exception) {
             (e.message ?: "Failed to save farm data").asError()
         }
@@ -99,6 +99,8 @@ private fun FarmData.toEntity(): FarmDataEntity {
         turbidity = turbidity,
         timestamp = timestamp,
         pondId = pondId,
+        latitude = latitude,
+        longitude = longitude,
         isSynced = isSynced
     )
 }
@@ -117,6 +119,8 @@ private fun FarmDataEntity.toDomain(): FarmData {
         turbidity = turbidity,
         timestamp = timestamp,
         pondId = pondId,
+        latitude = latitude,
+        longitude = longitude,
         isSynced = isSynced
     )
 }

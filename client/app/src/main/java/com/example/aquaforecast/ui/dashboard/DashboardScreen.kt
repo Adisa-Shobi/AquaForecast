@@ -27,6 +27,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.example.aquaforecast.R
 import com.example.aquaforecast.ui.components.AppCompactButton
 import com.example.aquaforecast.ui.components.AppCompactOutlinedButton
 import com.example.aquaforecast.ui.components.AppDialogButton
@@ -56,7 +58,7 @@ fun DashboardScreen(
         CenterAlignedTopAppBar(
             title = {
                 Text(
-                    text = "Dashboard",
+                    text = stringResource(R.string.dashboard_title),
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold
                     )
@@ -65,25 +67,7 @@ fun DashboardScreen(
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = Color.Transparent,
                 titleContentColor = MaterialTheme.colorScheme.onPrimary
-            ),
-            actions = {
-                if (!state.isRefreshing) {
-                    AppIconButton(
-                        icon = Icons.Default.Refresh,
-                        onClick = { viewModel.refresh() },
-                        contentDescription = "Refresh predictions",
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .padding(12.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
+            )
         )
 
         // Content
@@ -103,20 +87,43 @@ fun DashboardScreen(
                 )
             }
 
-            state.latestPrediction == null && state.latestFarmData == null -> {
-                NoDataState(
-                    pondName = state.selectedPond?.name ?: "this pond",
-                    onNavigateToDataEntry = onNavigateToDataEntry,
-                    hasError = state.error != null,
-                    errorMessage = state.error
-                )
-            }
-
             else -> {
-                DashboardContent(
-                    state = state,
-                    viewModel = viewModel
-                )
+                // Show pond selector and content
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Pond selector - always visible when ponds exist
+                    if (state.availablePonds.isNotEmpty()) {
+                        PondSelectorWithHeader(
+                            ponds = state.availablePonds,
+                            selectedPond = state.selectedPond,
+                            expanded = state.isPondDropdownExpanded,
+                            onExpandedChange = viewModel::togglePondDropdown,
+                            onPondSelected = viewModel::onPondSelected,
+                            enabled = true,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+
+                    // Content area
+                    when {
+                        state.latestPrediction == null && state.latestFarmData == null -> {
+                            NoDataState(
+                                pondName = state.selectedPond?.name ?: "this pond",
+                                onNavigateToDataEntry = onNavigateToDataEntry,
+                                hasError = state.error != null,
+                                errorMessage = state.error
+                            )
+                        }
+
+                        else -> {
+                            DashboardContent(
+                                state = state,
+                                viewModel = viewModel
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -135,18 +142,6 @@ private fun DashboardContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Pond Selection Dropdown
-        if (state.availablePonds.isNotEmpty()) {
-            PondSelectorWithHeader(
-                ponds = state.availablePonds,
-                selectedPond = state.selectedPond,
-                expanded = state.isPondDropdownExpanded,
-                onExpandedChange = viewModel::togglePondDropdown,
-                onPondSelected = viewModel::onPondSelected,
-                enabled = !state.isRefreshing
-            )
-        }
-
         // Current Stats Overview
         state.latestPrediction?.let { prediction ->
             CurrentStatsCard(state = state, prediction = prediction)
@@ -220,7 +215,7 @@ private fun CurrentStatsCard(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Current Fish Stats",
+                text = stringResource(R.string.dashboard_current_stats),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -233,7 +228,7 @@ private fun CurrentStatsCard(
                 // Weight
                 StatItem(
                     icon = Icons.Outlined.MonitorWeight,
-                    label = "Average Weight",
+                    label = stringResource(R.string.dashboard_avg_weight),
                     value = prediction.getFormattedWeight(),
                     modifier = Modifier.weight(1f)
                 )
@@ -243,7 +238,7 @@ private fun CurrentStatsCard(
                 // Length
                 StatItem(
                     icon = Icons.Outlined.Straighten,
-                    label = "Average Length",
+                    label = stringResource(R.string.dashboard_avg_length),
                     value = prediction.getFormattedLength(),
                     modifier = Modifier.weight(1f)
                 )

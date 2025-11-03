@@ -4,6 +4,14 @@ import com.example.aquaforecast.domain.model.Pond
 import com.example.aquaforecast.domain.model.WaterQualityStatus
 
 /**
+ * Location type selection for data entry
+ */
+enum class LocationType {
+    CURRENT,
+    LAST_KNOWN
+}
+
+/**
  * UI State for data entry screen
  */
 data class EntryState(
@@ -40,6 +48,21 @@ data class EntryState(
     // Dialog states
     val showReportDeathDialog: Boolean = false,
     val showHarvestDialog: Boolean = false,
+    val showPredictionVerificationDialog: Boolean = false,
+
+    // Prediction verification
+    val predictedWeight: Double? = null,
+    val predictedLength: Double? = null,
+    val savedFarmDataId: Long? = null,
+
+    // Location
+    val locationPermissionGranted: Boolean = false,
+    val shouldRequestLocationPermission: Boolean = false,
+    val locationType: LocationType = LocationType.CURRENT,
+    val capturedLatitude: Double? = null,
+    val capturedLongitude: Double? = null,
+    val isCapturingLocation: Boolean = false,
+    val locationError: String? = null,
 
     // Validation
     val canSave: Boolean = false

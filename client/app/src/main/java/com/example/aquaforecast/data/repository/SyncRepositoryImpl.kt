@@ -1,7 +1,6 @@
 package com.example.aquaforecast.data.repository
 
 import android.content.Context
-import android.location.Location
 import android.util.Log
 import com.example.aquaforecast.data.local.dao.FarmDataDao
 import com.example.aquaforecast.data.local.dao.PondDao
@@ -14,9 +13,6 @@ import com.example.aquaforecast.domain.repository.Result
 import com.example.aquaforecast.domain.repository.SyncRepository
 import com.example.aquaforecast.domain.repository.asError
 import com.example.aquaforecast.domain.repository.asSuccess
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -86,9 +82,6 @@ class SyncRepositoryImpl(
 
             Log.d(TAG, "Syncing ${unsyncedEntities.size} entries")
 
-            // Get device location
-            val location = getDeviceLocation()
-
             // Map entities to DTOs
             val readings = unsyncedEntities.mapNotNull { entity ->
                 try {
@@ -106,6 +99,14 @@ class SyncRepositoryImpl(
                     val recordedAt = formatTimestampISO(entity.timestamp)
                     val startDate = formatDateISO(pond.startDate)
 
+                    // Use stored location from entity (captured at data entry time)
+                    val latitude = entity.latitude ?: 0.0
+                    val longitude = entity.longitude ?: 0.0
+
+                    if (entity.latitude == null || entity.longitude == null) {
+                        Log.w(TAG, "Location not available for entry ${entity.id}")
+                    }
+
                     FarmDataReading(
                         temperature = entity.temperature,
                         ph = entity.ph,
@@ -118,10 +119,10 @@ class SyncRepositoryImpl(
                         verified = prediction?.verified ?: false,
                         startDate = startDate,
                         location = LocationData(
-                            latitude = location?.latitude ?: 0.0,
-                            longitude = location?.longitude ?: 0.0
+                            latitude = latitude,
+                            longitude = longitude
                         ),
-                        countryCode = getCountryCode(location),
+                        countryCode = null, // Optional field
                         recordedAt = recordedAt
                     )
                 } catch (e: Exception) {
@@ -259,35 +260,14 @@ class SyncRepositoryImpl(
         }
     }
 
-    /**
-     * Get device location using FusedLocationProviderClient
-     */
-    private suspend fun getDeviceLocation(): Location? = withContext(Dispatchers.IO) {
+    override suspend fun getUnsyncedCount(): Result<Int> = withContext(Dispatchers.IO) {
         try {
-            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-            val cancellationTokenSource = CancellationTokenSource()
-
-            @Suppress("MissingPermission")
-            val location = fusedLocationClient.getCurrentLocation(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                cancellationTokenSource.token
-            ).await()
-
-            location
+            val unsyncedEntities = farmDataDao.getUnsyncedData()
+            unsyncedEntities.size.asSuccess()
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to get location: ${e.message}")
-            null
+            Log.e(TAG, "Failed to get unsynced count", e)
+            (e.message ?: "Failed to get unsynced count").asError()
         }
-    }
-
-    /**
-     * Get country code from location (simplified implementation)
-     * In production, you'd use Geocoder or a location API
-     */
-    private fun getCountryCode(location: Location?): String? {
-        // TODO: Implement proper country code lookup
-        // For now, return null - backend will accept it as optional
-        return null
     }
 
     /**

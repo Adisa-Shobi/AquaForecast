@@ -36,17 +36,16 @@ This file contains:
 4. ammonia(g/ml)
 5. nitrate(g/ml)
 6. turbidity(ntu)
-7. population
 
 **Engineered features (8):**
-8. days_in_farm - Days since pond creation
-9. day_of_year - Seasonal feature (1-366)
-10. hour - Hour of day (0-23)
-11. sin_hour - Cyclic encoding of hour
-12. cos_hour - Cyclic encoding of hour
-13. temp_do_interaction - temperature × dissolved_oxygen
-14. avg_do_7d - 7-day rolling average of DO
-16. avg_wqi_7d - Water quality deviation: |avg_do_7d - optimal_do| / optimal_do
+7. days_in_farm - Days since pond creation
+8. day_of_year - Seasonal feature (1-366)
+9. hour - Hour of day (0-23)
+10. sin_hour - Cyclic encoding of hour
+11. cos_hour - Cyclic encoding of hour
+12. temp_do_interaction - temperature × dissolved_oxygen
+13. avg_do_7d - 7-day rolling average of DO
+14. avg_wqi_7d - Water quality deviation: |avg_do_7d - optimal_do| / optimal_do
 
 ### Output: 2 Predictions
 

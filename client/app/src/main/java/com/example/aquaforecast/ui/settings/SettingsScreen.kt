@@ -42,6 +42,30 @@ fun SettingsScreen(
         }
     }
 
+    // Show sync message
+    LaunchedEffect(state.syncMessage) {
+        state.syncMessage?.let { message ->
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Short
+            )
+            viewModel.clearSyncMessage()
+        }
+    }
+
+    // Show model update message
+    LaunchedEffect(state.modelUpdateMessage) {
+        state.modelUpdateMessage?.let { message ->
+            if (message.contains("updated", ignoreCase = true)) {
+                snackbarHostState.showSnackbar(
+                    message = message,
+                    duration = SnackbarDuration.Short
+                )
+                viewModel.clearModelUpdateMessage()
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Top App Bar
@@ -146,34 +170,70 @@ fun SettingsScreen(
                 ) {
                     Column {
                         // Sync Data
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Sync Data",
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                                if (!state.isAuthenticated) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Sign in required",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.error
+                                        text = "Sync Data",
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                    when {
+                                        !state.isAuthenticated -> {
+                                            Text(
+                                                text = "Sign in required",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                        state.isSyncing -> {
+                                            Text(
+                                                text = state.syncMessage ?: "Syncing...",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (state.isSyncing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    AppIconButton(
+                                        icon = Icons.Default.Sync,
+                                        onClick = viewModel::syncData,
+                                        enabled = state.isAuthenticated && !state.isOfflineMode,
+                                        contentDescription = "Sync",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
 
-                            AppIconButton(
-                                icon = Icons.Default.Sync,
-                                onClick = viewModel::syncData,
-                                enabled = !state.isSyncing && state.isAuthenticated && !state.isOfflineMode,
-                                contentDescription = "Sync",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            // Show sync status message when not syncing
+                            state.syncMessage?.let { message ->
+                                if (!state.isSyncing) {
+                                    Text(
+                                        text = message,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (state.syncSuccess) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.error
+                                        }
+                                    )
+                                }
+                            }
                         }
 
                         HorizontalDivider()
@@ -201,6 +261,100 @@ fun SettingsScreen(
                             Switch(
                                 checked = state.isOfflineMode,
                                 onCheckedChange = { viewModel.toggleOfflineMode() }
+                            )
+                        }
+                    }
+                }
+
+                // ML Model Section
+                SectionHeader(title = "ML Model")
+
+                AppCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = 0.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Model Version Info
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Current Version",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = state.modelVersion,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ModelTraining,
+                                contentDescription = "Model",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        HorizontalDivider()
+
+                        // Check for Updates
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Check for Updates",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                state.modelUpdateMessage?.let { message ->
+                                    Text(
+                                        text = message,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = when {
+                                            state.modelUpdateAvailable -> MaterialTheme.colorScheme.primary
+                                            message.contains("failed", ignoreCase = true) -> MaterialTheme.colorScheme.error
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
+                                    )
+                                }
+                            }
+
+                            if (state.isCheckingModel) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                AppIconButton(
+                                    icon = Icons.Default.Refresh,
+                                    onClick = viewModel::checkForModelUpdate,
+                                    enabled = !state.isOfflineMode && !state.isUpdatingModel,
+                                    contentDescription = "Check for updates",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Update Button (shown only when update is available)
+                        if (state.modelUpdateAvailable && state.availableModelVersion != null) {
+                            AppButton(
+                                text = if (state.isUpdatingModel) {
+                                    "Downloading..."
+                                } else {
+                                    "Update to ${state.availableModelVersion}"
+                                },
+                                onClick = viewModel::updateModel,
+                                enabled = !state.isUpdatingModel && !state.isOfflineMode,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }

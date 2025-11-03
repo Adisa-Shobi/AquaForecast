@@ -39,4 +39,13 @@ interface SyncRepository {
      *         Result.Error with message if retrieval failed
      */
     suspend fun getLastSyncTime(): Result<Long?>
+
+    /**
+     * Get the count of unsynced farm data entries
+     * Used to show progress information to the user before syncing
+     *
+     * @return Result.Success with count of unsynced entries,
+     *         Result.Error with message if retrieval failed
+     */
+    suspend fun getUnsyncedCount(): Result<Int>
 }

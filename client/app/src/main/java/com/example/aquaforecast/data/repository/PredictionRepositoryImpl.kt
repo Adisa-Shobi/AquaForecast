@@ -74,7 +74,9 @@ private fun Prediction.toEntity(): PredictionEntity {
         predictedLength = predictedLength,
         harvestDate = harvestDate,
         createdAt = createdAt,
-        pondId = pondId
+        pondId = pondId,
+        farmDataId = farmDataId,
+        verified = verified
     )
 }
 
@@ -89,6 +91,8 @@ private fun PredictionEntity.toDomain(): Prediction {
         harvestDate = harvestDate,
         confidence = 0.0,  // Default confidence, can be added to entity later
         createdAt = createdAt,
-        pondId = pondId
+        pondId = pondId,
+        farmDataId = farmDataId,
+        verified = verified
     )
 }

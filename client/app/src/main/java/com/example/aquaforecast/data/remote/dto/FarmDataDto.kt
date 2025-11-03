@@ -65,23 +65,28 @@ data class ErrorData(
     val details: Map<String, String>? = null
 )
 
+// Auth DTOs
 @Serializable
-data class ModelVersionResponse(
-    val success: Boolean,
-    val data: ModelVersionData? = null
+data class RegisterRequest(
+    @SerialName("firebase_uid")
+    val firebaseUid: String,
+    val email: String
 )
 
 @Serializable
-data class ModelVersionData(
-    val version: String,
-    @SerialName("model_url")
-    val modelUrl: String,
-    @SerialName("model_size_bytes")
-    val modelSizeBytes: Long? = null,
-    @SerialName("preprocessing_config")
-    val preprocessingConfig: Map<String, String>? = null,
-    @SerialName("is_active")
-    val isActive: Boolean,
-    @SerialName("min_app_version")
-    val minAppVersion: String? = null
+data class RegisterResponse(
+    val success: Boolean,
+    val data: RegisterData? = null,
+    val error: ErrorData? = null
+)
+
+@Serializable
+data class RegisterData(
+    @SerialName("user_id")
+    val userId: String,
+    @SerialName("firebase_uid")
+    val firebaseUid: String,
+    val email: String,
+    @SerialName("created_at")
+    val createdAt: String
 )

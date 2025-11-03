@@ -84,22 +84,38 @@ fun WaterQualityTextField(
     placeholder: String,
     modifier: Modifier = Modifier,
     status: WaterQualityStatus? = null,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    supportingText: String? = null
 ) {
-    AppOutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        placeholder = placeholder,
-        label = label,
-        keyboardType = KeyboardType.Decimal,
-        enabled = enabled,
-        trailingIcon = {
-            status?.let {
-                StatusIndicator(status = it)
-            }
-        },
-        modifier = modifier
-    )
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        AppOutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = placeholder,
+            label = label,
+            keyboardType = KeyboardType.Decimal,
+            enabled = enabled,
+            trailingIcon = {
+                status?.let {
+                    StatusIndicator(status = it)
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Supporting hint text
+        supportingText?.let { hint ->
+            Text(
+                text = hint,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.padding(start = 16.dp, top = 2.dp)
+            )
+        }
+    }
 }
 
 /**

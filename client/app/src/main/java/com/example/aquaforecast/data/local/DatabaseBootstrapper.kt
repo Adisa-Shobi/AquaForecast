@@ -1,6 +1,7 @@
 package com.example.aquaforecast.data.local
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -57,8 +58,7 @@ class DatabaseBootstrapper(
                 preferences[bootstrapKey] = true
             }
         } catch (e: Exception) {
-            // Log error but don't crash the app
-            e.printStackTrace()
+            Log.e("DatabaseBootstrapper", "Bootstrap failed", e)
         }
     }
 
@@ -101,24 +101,33 @@ class DatabaseBootstrapper(
 
     private suspend fun insertSampleFarmData() {
         val currentTime = System.currentTimeMillis()
-        val farmDataList = mutableListOf<FarmDataEntity>()
 
-        // Generate data for the last 30 days for each pond
-        val ponds = listOf("1", "2", "3")
+        // Generate exactly 100 entries for ML training (minimum required)
+        // Strategy: Generate 34, 33, 33 entries for ponds 1, 2, 3 respectively
+        val pondEntries = mapOf(
+            "1" to 34,
+            "2" to 33,
+            "3" to 33
+        )
 
-        ponds.forEach { pondId ->
-            for (day in 0..29) {
+        pondEntries.forEach { (pondId, entryCount) ->
+            for (day in 0 until entryCount) {
                 val timestamp = currentTime - TimeUnit.DAYS.toMillis(day.toLong())
 
-                // Generate realistic varying water parameters
-                val baseTemp = 28.0
+                // Generate realistic varying water parameters based on pond lifecycle
+                // Water quality typically changes as fish grow and pond matures
+                val pondAge = 90 - day // Simulate pond age in days
+                val ageFactorTemp = if (pondAge > 60) 0.5 else 0.0 // Older ponds slightly warmer
+                val ageFactorAmmonia = if (pondAge > 45) 0.05 else 0.0 // More waste accumulation
+
+                val baseTemp = 28.0 + ageFactorTemp
                 val basePh = 7.2
                 val baseDO = 6.5
-                val baseAmmonia = 0.1
+                val baseAmmonia = 0.1 + ageFactorAmmonia
                 val baseNitrate = 10.0
                 val baseTurbidity = 25.0
 
-                // Add some variation
+                // Add realistic daily variation (Gaussian-like distribution)
                 val tempVariation = (Math.random() - 0.5) * 2
                 val phVariation = (Math.random() - 0.5) * 0.6
                 val doVariation = (Math.random() - 0.5) * 1.5
@@ -126,64 +135,76 @@ class DatabaseBootstrapper(
                 val nitrateVariation = (Math.random() - 0.5) * 5
                 val turbidityVariation = (Math.random() - 0.5) * 10
 
-                farmDataList.add(
-                    FarmDataEntity(
-                        temperature = baseTemp + tempVariation,
-                        ph = basePh + phVariation,
-                        dissolvedOxygen = baseDO + doVariation,
-                        ammonia = (baseAmmonia + ammoniaVariation).coerceAtLeast(0.0),
-                        nitrate = (baseNitrate + nitrateVariation).coerceAtLeast(0.0),
-                        turbidity = (baseTurbidity + turbidityVariation).coerceAtLeast(0.0),
-                        timestamp = timestamp,
-                        pondId = pondId,
-                        isSynced = day < 15 // Older data is synced
-                    )
-                )
-            }
-        }
+                // Generate realistic location coordinates for East African aquaculture region
+                // Example: Uganda/Kenya/Tanzania region
+                // Latitude: -5 to 5 (equatorial region)
+                // Longitude: 29 to 42 (East Africa)
+                val baseLatitude = 0.0 // Equatorial region
+                val baseLongitude = 32.5 // Uganda/Kenya region
+                val randomLatitude = baseLatitude + ((Math.random() - 0.5) * 10) // ±5 degrees
+                val randomLongitude = baseLongitude + ((Math.random() - 0.5) * 13) // ±6.5 degrees
 
-        farmDataList.forEach { farmData ->
-            farmDataDao.insert(farmData)
+                val farmData = FarmDataEntity(
+                    temperature = (baseTemp + tempVariation).coerceIn(22.0, 35.0), // Realistic range
+                    ph = (basePh + phVariation).coerceIn(6.0, 9.0), // Safe pH range
+                    dissolvedOxygen = (baseDO + doVariation).coerceIn(3.0, 12.0), // Realistic DO
+                    ammonia = (baseAmmonia + ammoniaVariation).coerceIn(0.0, 0.5), // Safe ammonia
+                    nitrate = (baseNitrate + nitrateVariation).coerceIn(0.0, 40.0), // Safe nitrate
+                    turbidity = (baseTurbidity + turbidityVariation).coerceIn(5.0, 80.0), // Realistic turbidity
+                    timestamp = timestamp,
+                    pondId = pondId,
+                    latitude = randomLatitude,
+                    longitude = randomLongitude,
+                    isSynced = false // Marked as unsynced so it will be synced to backend
+                )
+
+                // Insert farm data and get the ID
+                val farmDataId = farmDataDao.insert(farmData)
+
+                // Create prediction for EVERY entry
+                // This matches real-world usage where every water quality reading generates a prediction
+                val baseDaysInFarm = 90 - day // Days since pond started (simulated)
+
+                // Realistic fish growth curve (catfish growth rates)
+                // Week 1-4: 0.3-0.5 kg, Week 5-8: 0.5-0.8 kg, Week 9-12: 0.8-1.2 kg
+                val growthWeek = baseDaysInFarm / 7
+                val baseWeight = when {
+                    growthWeek < 4 -> 0.3 + (growthWeek * 0.05) // Early growth
+                    growthWeek < 8 -> 0.5 + ((growthWeek - 4) * 0.075) // Mid growth
+                    else -> 0.8 + ((growthWeek - 8) * 0.05) // Late growth
+                }
+
+                // Length correlates with weight (allometric growth)
+                val baseLength = 15.0 + (Math.pow(baseWeight * 100, 0.4) * 2.5)
+
+                // Add realistic biological variation (5-10% CV)
+                val weightVariation = baseWeight * ((Math.random() - 0.5) * 0.15)
+                val lengthVariation = baseLength * ((Math.random() - 0.5) * 0.1)
+
+                // All bootstrap entries are verified for ML training
+                // This provides exactly 100 verified entries for initial model training
+                val prediction = PredictionEntity(
+                    predictedWeight = (baseWeight + weightVariation).coerceIn(0.1, 3.0),
+                    predictedLength = (baseLength + lengthVariation).coerceIn(10.0, 60.0),
+                    harvestDate = timestamp + TimeUnit.DAYS.toMillis(30), // 30 days ahead
+                    createdAt = timestamp,
+                    pondId = pondId,
+                    farmDataId = farmDataId,
+                    verified = true // All bootstrap data is verified for ML training
+                )
+
+                predictionDao.insert(prediction)
+            }
         }
     }
 
     private suspend fun insertSamplePredictions() {
-        val currentTime = System.currentTimeMillis()
-        val predictions = listOf(
-            PredictionEntity(
-                predictedWeight = 0.4505,
-                predictedLength = 28.3,
-                harvestDate = currentTime + TimeUnit.DAYS.toMillis(30),
-                createdAt = currentTime,
-                pondId = "1"
-            ),
-            PredictionEntity(
-                predictedWeight = 0.5202,
-                predictedLength = 31.5,
-                harvestDate = currentTime + TimeUnit.DAYS.toMillis(60),
-                createdAt = currentTime,
-                pondId = "2"
-            ),
-            PredictionEntity(
-                predictedWeight = 0.3800,
-                predictedLength = 25.8,
-                harvestDate = currentTime + TimeUnit.DAYS.toMillis(45),
-                createdAt = currentTime,
-                pondId = "3"
-            ),
-            // Add historical prediction for Pond 1
-            PredictionEntity(
-                predictedWeight = 0.4200,
-                predictedLength = 26.5,
-                harvestDate = currentTime + TimeUnit.DAYS.toMillis(20),
-                createdAt = currentTime - TimeUnit.DAYS.toMillis(10),
-                pondId = "1"
-            )
-        )
+        // Predictions are now created inline with farm data entries (see insertSampleFarmData)
+        // This method can be used for creating standalone predictions for testing specific features
+        // For now, it's kept empty but can be used to add additional test predictions if needed
 
-        predictions.forEach { prediction ->
-            predictionDao.insert(prediction)
-        }
+        // Note: Most predictions are now linked to farmDataId and created in insertSampleFarmData()
+        // This ensures proper sync logic testing where predictions are associated with specific readings
     }
 
     private suspend fun insertSampleFeedingSchedules() {

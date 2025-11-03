@@ -9,6 +9,8 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import com.example.aquaforecast.R
+import com.example.aquaforecast.data.remote.ApiService
+import com.example.aquaforecast.data.remote.dto.RegisterRequest
 import com.example.aquaforecast.domain.model.User
 import com.example.aquaforecast.domain.repository.AuthRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -27,6 +29,8 @@ import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import retrofit2.HttpException
+import java.io.IOException
 
 private const val TAG = "AuthRepositoryImpl"
 
@@ -34,7 +38,8 @@ private const val TAG = "AuthRepositoryImpl"
  * Implementation of AuthRepository using Firebase Authentication
  */
 class AuthRepositoryImpl(
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val apiService: ApiService
 ) : AuthRepository {
 
     override suspend fun loginWithEmail(email: String, password: String): Result<User> =
@@ -44,6 +49,9 @@ class AuthRepositoryImpl(
                 val firebaseUser = result.user
 
                 if (firebaseUser != null) {
+                    // Always attempt to register with backend
+                    attemptBackendRegistration(firebaseUser, "login")
+
                     User(
                         uid = firebaseUser.uid,
                         email = firebaseUser.email,
@@ -67,6 +75,9 @@ class AuthRepositoryImpl(
                 val firebaseUser = result.user
 
                 if (firebaseUser != null) {
+                    // Always attempt to register with backend
+                    attemptBackendRegistration(firebaseUser, "signup")
+
                     User(
                         uid = firebaseUser.uid,
                         email = firebaseUser.email,
@@ -149,6 +160,10 @@ class AuthRepositoryImpl(
 
                 if (firebaseUser != null) {
                     Log.d(TAG, "Firebase sign-in successful: ${firebaseUser.uid}")
+
+                    // Always attempt to register with backend
+                    attemptBackendRegistration(firebaseUser, "Google sign-in")
+
                     User(
                         uid = firebaseUser.uid,
                         email = firebaseUser.email,
@@ -236,6 +251,85 @@ class AuthRepositoryImpl(
                 (e.message ?: "Failed to send password reset email").asError()
             }
         }
+
+    override suspend fun registerWithBackend(
+        firebaseUid: String,
+        email: String,
+        token: String
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Registering user with backend: $firebaseUid")
+
+            val request = RegisterRequest(
+                firebaseUid = firebaseUid,
+                email = email
+            )
+
+            val response = apiService.registerUser(
+                authToken = "Bearer $token",
+                request = request
+            )
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body?.success == true) {
+                    Log.d(TAG, "Successfully registered user with backend")
+                    Unit.asSuccess()
+                } else {
+                    val errorMsg = body?.error?.message ?: "Backend registration failed"
+                    Log.e(TAG, "Backend registration failed: $errorMsg")
+                    errorMsg.asError()
+                }
+            } else {
+                val errorMsg = "Backend registration failed: HTTP ${response.code()}"
+                Log.e(TAG, errorMsg)
+                errorMsg.asError()
+            }
+        } catch (e: HttpException) {
+            val errorMsg = "Backend registration HTTP error: ${e.code()}"
+            Log.e(TAG, errorMsg, e)
+            errorMsg.asError()
+        } catch (e: IOException) {
+            val errorMsg = "Backend registration network error: ${e.message}"
+            Log.e(TAG, errorMsg, e)
+            errorMsg.asError()
+        } catch (e: Exception) {
+            val errorMsg = "Backend registration failed: ${e.message}"
+            Log.e(TAG, errorMsg, e)
+            errorMsg.asError()
+        }
+    }
+
+    /**
+     * Attempt to register user with backend (idempotent operation)
+     * Logs errors but doesn't fail the authentication flow
+     */
+    private suspend fun attemptBackendRegistration(firebaseUser: com.google.firebase.auth.FirebaseUser, context: String) {
+        try {
+            val token = firebaseUser.getIdToken(false).await().token
+            val email = firebaseUser.email
+
+            if (token == null) {
+                Log.e(TAG, "Failed to get Firebase token for backend registration")
+            } else if (email == null) {
+                Log.e(TAG, "User email is null, cannot register with backend")
+            } else {
+                val backendResult = registerWithBackend(
+                    firebaseUid = firebaseUser.uid,
+                    email = email,
+                    token = token
+                )
+
+                if (backendResult is com.example.aquaforecast.domain.repository.Result.Error) {
+                    Log.e(TAG, "Backend registration failed during $context: ${backendResult.message}")
+                } else {
+                    Log.d(TAG, "Successfully registered with backend during $context")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception during backend registration: ${e.message}", e)
+        }
+    }
 
     /**
      * Handle Firebase Auth exceptions and return user-friendly messages

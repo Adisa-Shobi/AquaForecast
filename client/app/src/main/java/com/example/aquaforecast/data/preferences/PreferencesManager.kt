@@ -5,6 +5,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -17,7 +19,10 @@ class PreferencesManager(private val dataStore: DataStore<Preferences>) {
     companion object {
         private val FORECAST_HORIZON_KEY = intPreferencesKey("forecast_horizon_days")
         private val OFFLINE_MODE_KEY = booleanPreferencesKey("offline_mode")
+        private val MODEL_VERSION_KEY = stringPreferencesKey("model_version")
+        private val MODEL_UPDATED_AT_KEY = longPreferencesKey("model_updated_at")
         const val DEFAULT_FORECAST_HORIZON = 20 // Default: predict 20 days into the future
+        const val DEFAULT_MODEL_VERSION = "built-in" // Indicates bundled model in assets
     }
 
     /**
@@ -71,6 +76,48 @@ class PreferencesManager(private val dataStore: DataStore<Preferences>) {
     suspend fun getOfflineModeValue(): Boolean {
         return dataStore.data.map { preferences ->
             preferences[OFFLINE_MODE_KEY] ?: false
+        }.first()
+    }
+
+    /**
+     * Get the current model version as a Flow
+     */
+    val modelVersion: Flow<String> = dataStore.data.map { preferences ->
+        preferences[MODEL_VERSION_KEY] ?: DEFAULT_MODEL_VERSION
+    }
+
+    /**
+     * Get when the model was last updated as a Flow
+     */
+    val modelUpdatedAt: Flow<Long?> = dataStore.data.map { preferences ->
+        preferences[MODEL_UPDATED_AT_KEY]
+    }
+
+    /**
+     * Update the model version information
+     */
+    suspend fun setModelVersion(version: String, updatedAt: Long = System.currentTimeMillis()) {
+        dataStore.edit { preferences ->
+            preferences[MODEL_VERSION_KEY] = version
+            preferences[MODEL_UPDATED_AT_KEY] = updatedAt
+        }
+    }
+
+    /**
+     * Get the current model version (suspend function for one-time reads)
+     */
+    suspend fun getModelVersionValue(): String {
+        return dataStore.data.map { preferences ->
+            preferences[MODEL_VERSION_KEY] ?: DEFAULT_MODEL_VERSION
+        }.first()
+    }
+
+    /**
+     * Get when the model was last updated (suspend function for one-time reads)
+     */
+    suspend fun getModelUpdatedAtValue(): Long? {
+        return dataStore.data.map { preferences ->
+            preferences[MODEL_UPDATED_AT_KEY]
         }.first()
     }
 }

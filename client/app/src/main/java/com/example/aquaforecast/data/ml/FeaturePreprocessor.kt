@@ -152,8 +152,10 @@ class FeaturePreprocessor(context: Context) {
         // IMPORTANT: In training, this was "days since first record" for each pond.
         // For consistency, pond.startDate should be set to the date of the FIRST data entry,
         // not the physical pond creation date. This ensures the feature matches training data.
-        val daysInFarm = ChronoUnit.DAYS.between(pond.startDate, LocalDate.now()).toFloat()
-            Log.d("FeaturePreprocessor", "daysInFarm $daysInFarm")
+        // Use the recorded_at date from latestData, not LocalDate.now()
+        val recordedDate = timestamp.toLocalDate()
+        val daysInFarm = ChronoUnit.DAYS.between(pond.startDate, recordedDate).toFloat()
+        Log.d("FeaturePreprocessor", "daysInFarm $daysInFarm (from ${pond.startDate} to $recordedDate)")
 
         // day_of_year: Extract from timestamp (1-366)
         val dayOfYear = timestamp.dayOfYear.toFloat()
