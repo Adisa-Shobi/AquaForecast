@@ -9,9 +9,9 @@ interface FarmDataRepository {
      * Save a new farm data entry to the database
      *
      * @param farmData The farm data entry to save containing water quality measurements
-     * @return Result.Success with Unit if saved successfully, Result.Error with message if failed
+     * @return Result.Success with the ID of the saved entry, Result.Error with message if failed
      */
-    suspend fun save(farmData: FarmData): Result<Unit>
+    suspend fun save(farmData: FarmData): Result<Long>
 
     /**
      * Retrieve all farm data entries from the database

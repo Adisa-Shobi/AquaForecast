@@ -1,6 +1,7 @@
 package com.example.aquaforecast.ui.auth
 
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -17,12 +18,14 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.aquaforecast.R
 import com.example.aquaforecast.ui.components.AppButton
 import com.example.aquaforecast.ui.components.AppIconButton
 import com.example.aquaforecast.ui.components.AppOutlinedButton
@@ -80,9 +83,10 @@ fun LoginScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "🐟",
-                        style = MaterialTheme.typography.displayMedium
+                    Image(
+                        painter = painterResource(id = R.drawable.logo_aquaforecast),
+                        contentDescription = "AquaForecast Logo",
+                        modifier = Modifier.size(120.dp)
                     )
 
                     Text(

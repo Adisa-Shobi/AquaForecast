@@ -50,4 +50,9 @@ interface AuthRepository {
      * Send password reset email
      */
     suspend fun sendPasswordResetEmail(email: String): Result<Unit>
+
+    /**
+     * Register user with backend after Firebase authentication
+     */
+    suspend fun registerWithBackend(firebaseUid: String, email: String, token: String): Result<Unit>
 }

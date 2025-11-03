@@ -11,7 +11,9 @@ data class Prediction(
     val harvestDate: Long,
     val confidence: Double = 0.0,  // Model confidence score (0.0 - 1.0)
     val createdAt: Long = System.currentTimeMillis(),
-    val pondId: String
+    val pondId: String,
+    val farmDataId: Long = 0,
+    val verified: Boolean = false
 ) {
     val daysUntilHarvest: Int
         get() {

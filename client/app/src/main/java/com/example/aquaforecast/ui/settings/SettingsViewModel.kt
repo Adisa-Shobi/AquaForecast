@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aquaforecast.data.preferences.PreferencesManager
 import com.example.aquaforecast.domain.repository.AuthRepository
+import com.example.aquaforecast.domain.repository.ModelRepository
 import com.example.aquaforecast.domain.repository.PondRepository
+import com.example.aquaforecast.domain.repository.SyncRepository
 import com.example.aquaforecast.domain.repository.onError
 import com.example.aquaforecast.domain.repository.onSuccess
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +21,9 @@ private const val TAG = "SettingsViewModel"
 class SettingsViewModel(
     private val pondRepository: PondRepository,
     private val authRepository: AuthRepository,
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val syncRepository: SyncRepository,
+    private val modelRepository: ModelRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsState())
@@ -30,6 +34,7 @@ class SettingsViewModel(
         loadForecastHorizon()
         loadOfflineMode()
         observeAuthState()
+        loadModelVersion()
     }
 
     private fun loadPondConfig() {
@@ -76,6 +81,14 @@ class SettingsViewModel(
                         userEmail = firebaseUser?.email
                     )
                 }
+            }
+        }
+    }
+
+    private fun loadModelVersion() {
+        viewModelScope.launch {
+            preferencesManager.modelVersion.collect { version ->
+                _state.update { it.copy(modelVersion = version) }
             }
         }
     }
@@ -238,10 +251,80 @@ class SettingsViewModel(
 
     fun syncData() {
         viewModelScope.launch {
-            _state.update { it.copy(isSyncing = true) }
-            kotlinx.coroutines.delay(2000)
-            // TODO: Implement data sync logic
-            _state.update { it.copy(isSyncing = false) }
+            _state.update {
+                it.copy(
+                    isSyncing = true,
+                    syncSuccess = false,
+                    syncMessage = "Checking for unsynced data...",
+                    syncedCount = null,
+                    syncingCount = null
+                )
+            }
+
+            // First, get the count of unsynced data
+            syncRepository.getUnsyncedCount()
+                .onSuccess { unsyncedCount ->
+                    if (unsyncedCount == 0) {
+                        // No data to sync
+                        _state.update {
+                            it.copy(
+                                isSyncing = false,
+                                syncSuccess = true,
+                                syncMessage = "No new data to sync",
+                                syncedCount = 0,
+                                syncingCount = null
+                            )
+                        }
+                        return@launch
+                    }
+
+                    // Update message with count
+                    _state.update {
+                        it.copy(
+                            syncMessage = "Syncing $unsyncedCount ${if (unsyncedCount == 1) "entry" else "entries"}...",
+                            syncingCount = unsyncedCount
+                        )
+                    }
+
+                    // Perform the sync
+                    syncRepository.syncData()
+                        .onSuccess { count ->
+                            Log.d(TAG, "Successfully synced $count entries")
+                            _state.update {
+                                it.copy(
+                                    isSyncing = false,
+                                    syncSuccess = true,
+                                    syncMessage = "Successfully synced $count ${if (count == 1) "entry" else "entries"}",
+                                    syncedCount = count,
+                                    syncingCount = null
+                                )
+                            }
+                        }
+                        .onError { message ->
+                            Log.e(TAG, "Sync failed: $message")
+                            _state.update {
+                                it.copy(
+                                    isSyncing = false,
+                                    syncSuccess = false,
+                                    syncMessage = message,
+                                    syncedCount = null,
+                                    syncingCount = null
+                                )
+                            }
+                        }
+                }
+                .onError { message ->
+                    Log.e(TAG, "Failed to get unsynced count: $message")
+                    _state.update {
+                        it.copy(
+                            isSyncing = false,
+                            syncSuccess = false,
+                            syncMessage = "Failed to prepare sync: $message",
+                            syncedCount = null,
+                            syncingCount = null
+                        )
+                    }
+                }
         }
     }
 
@@ -288,6 +371,92 @@ class SettingsViewModel(
 
     fun clearSaveSuccess() {
         _state.update { it.copy(saveSuccess = false) }
+    }
+
+    fun clearSyncMessage() {
+        _state.update {
+            it.copy(
+                syncSuccess = false,
+                syncMessage = null,
+                syncedCount = null
+            )
+        }
+    }
+
+    fun checkForModelUpdate() {
+        viewModelScope.launch {
+            _state.update { it.copy(isCheckingModel = true, modelUpdateMessage = null) }
+
+            modelRepository.checkForModelUpdate()
+                .onSuccess { newVersion ->
+                    if (newVersion != null) {
+                        _state.update {
+                            it.copy(
+                                isCheckingModel = false,
+                                modelUpdateAvailable = true,
+                                availableModelVersion = newVersion.version,
+                                modelUpdateMessage = "Version ${newVersion.version} available"
+                            )
+                        }
+                    } else {
+                        _state.update {
+                            it.copy(
+                                isCheckingModel = false,
+                                modelUpdateAvailable = false,
+                                modelUpdateMessage = "You have the latest model"
+                            )
+                        }
+                    }
+                }
+                .onError { message ->
+                    _state.update {
+                        it.copy(
+                            isCheckingModel = false,
+                            modelUpdateMessage = "Check failed: $message"
+                        )
+                    }
+                }
+        }
+    }
+
+    fun updateModel() {
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    isUpdatingModel = true,
+                    modelUpdateMessage = "Downloading model..."
+                )
+            }
+
+            modelRepository.updateModel()
+                .onSuccess { newVersion ->
+                    _state.update {
+                        it.copy(
+                            isUpdatingModel = false,
+                            modelUpdateAvailable = false,
+                            modelVersion = newVersion.version,
+                            modelUpdateMessage = "Model updated to ${newVersion.version}"
+                        )
+                    }
+                }
+                .onError { message ->
+                    _state.update {
+                        it.copy(
+                            isUpdatingModel = false,
+                            modelUpdateMessage = "Update failed: $message"
+                        )
+                    }
+                }
+        }
+    }
+
+    fun clearModelUpdateMessage() {
+        _state.update {
+            it.copy(
+                modelUpdateMessage = null,
+                modelUpdateAvailable = false
+            )
+        }
     }
 
     private fun validatePondName(name: String): String? {
@@ -357,5 +526,16 @@ data class SettingsState(
     val isSyncing: Boolean = false,
     val error: String? = null,
     val saveSuccess: Boolean = false,
-    val isConfigured: Boolean = false
+    val isConfigured: Boolean = false,
+    val syncSuccess: Boolean = false,
+    val syncMessage: String? = null,
+    val syncedCount: Int? = null,
+    val syncingCount: Int? = null, // Number of entries currently being synced
+    // Model versioning
+    val modelVersion: String = "built-in",
+    val isCheckingModel: Boolean = false,
+    val isUpdatingModel: Boolean = false,
+    val modelUpdateAvailable: Boolean = false,
+    val availableModelVersion: String? = null,
+    val modelUpdateMessage: String? = null
 )

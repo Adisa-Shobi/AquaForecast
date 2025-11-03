@@ -14,7 +14,6 @@ data class DashboardState(
     val latestPrediction: Prediction? = null,
     val latestFarmData: FarmData? = null,
     val growthProjections: List<GrowthProjection> = emptyList(),
-    val isRefreshing: Boolean = false,
     val isOfflineMode: Boolean = false,
     val forecastHorizonDays: Int = 20,
     val showReportDeathDialog: Boolean = false,

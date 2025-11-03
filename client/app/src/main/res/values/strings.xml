@@ -1,4 +1,207 @@
 <resources>
+    <!-- App Info -->
     <string name="app_name">AquaForecast</string>
     <string name="channel_name">Feeding Reminders</string>
+
+    <!-- Common Actions -->
+    <string name="action_save">Save</string>
+    <string name="action_save_offline">Save Offline</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_sync">Sync</string>
+    <string name="action_logout">Logout</string>
+    <string name="action_delete">Delete</string>
+
+    <!-- Common Labels -->
+    <string name="label_location">Location</string>
+    <string name="label_current_location">Current Location</string>
+    <string name="label_last_known_location">Last Known Location</string>
+    <string name="label_capture_location">Capture Location</string>
+    <string name="label_recapture_location">Recapture Location</string>
+    <string name="label_location_captured">Location Captured</string>
+    <string name="label_latitude">Latitude</string>
+    <string name="label_longitude">Longitude</string>
+
+    <!-- Dashboard Screen -->
+    <string name="dashboard_title">Dashboard</string>
+    <string name="dashboard_refresh_predictions">Refresh predictions</string>
+    <string name="dashboard_no_ponds_title">No Pond Configured</string>
+    <string name="dashboard_no_ponds_message">Please go to Settings screen to configure your pond to start viewing predictions.</string>
+    <string name="dashboard_no_data_title">No Data Available</string>
+    <string name="dashboard_no_data_error_title">Error Loading Data</string>
+    <string name="dashboard_no_data_message">Add water quality data for %1$s to see growth predictions. Visit the Data Entry screen to get started.</string>
+    <string name="dashboard_current_stats">Current Fish Stats</string>
+    <string name="dashboard_avg_weight">Average Weight</string>
+    <string name="dashboard_avg_length">Average Length</string>
+    <string name="dashboard_stock_count">Stock Count</string>
+    <string name="dashboard_total_biomass">Total Biomass</string>
+    <string name="dashboard_expected_harvest">Expected Harvest</string>
+    <string name="dashboard_days_suffix">days</string>
+    <string name="dashboard_growth_projection">Growth Projection</string>
+    <string name="dashboard_next_n_days">Next %1$d days</string>
+    <string name="dashboard_current">Current</string>
+    <string name="dashboard_projected">Projected</string>
+    <string name="dashboard_water_quality">Water Quality</string>
+    <string name="dashboard_status_optimal">Optimal</string>
+    <string name="dashboard_status_warning">Warning</string>
+    <string name="dashboard_status_critical">Critical</string>
+    <string name="dashboard_quick_info">Quick Info</string>
+    <string name="dashboard_quick_info_message">Predictions are updated daily based on your water quality data and feeding schedule.</string>
+    <string name="dashboard_harvested_badge">This pond has been harvested and is now read-only. Manage from Pond Management.</string>
+    <string name="dashboard_fish_count_suffix">fish</string>
+    <string name="dashboard_biomass_unit">kg</string>
+
+    <!-- Data Entry Screen -->
+    <string name="data_entry_title">Water Quality Data Entry</string>
+    <string name="data_entry_no_pond_title">No Pond Configured</string>
+    <string name="data_entry_no_pond_message">Please go to Settings screen to configure your pond before entering data.</string>
+    <string name="data_entry_pond_harvested_title">Pond Harvested</string>
+    <string name="data_entry_pond_harvested_message">This pond has been marked as harvested. Data entry is disabled.</string>
+    <string name="data_entry_section_pond_actions">Pond Actions</string>
+    <string name="data_entry_section_water_params">Water Parameters</string>
+    <string name="data_entry_section_location">Location Information</string>
+    <string name="data_entry_report_deaths">Report Deaths</string>
+    <string name="data_entry_mark_harvested">Mark Harvested</string>
+
+    <!-- Water Quality Parameters -->
+    <string name="param_temperature_label">Temperature (°C)</string>
+    <string name="param_temperature_placeholder">Enter temperature</string>
+    <string name="param_temperature_hint">Optimal range: 25-30°C for most fish species</string>
+    <string name="param_ph_label">pH</string>
+    <string name="param_ph_placeholder">Enter pH value</string>
+    <string name="param_ph_hint">Ideal range: 6.5-8.5 (neutral to slightly alkaline)</string>
+    <string name="param_do_label">Dissolved Oxygen (mg/L)</string>
+    <string name="param_do_placeholder">Enter value</string>
+    <string name="param_do_hint">Recommended: Above 5.0 mg/L for healthy fish</string>
+    <string name="param_ammonia_label">Ammonia (mg/L)</string>
+    <string name="param_ammonia_placeholder">Enter value</string>
+    <string name="param_ammonia_hint">Keep below 0.5 mg/L. High levels are toxic to fish</string>
+    <string name="param_nitrate_label">Nitrate (mg/L)</string>
+    <string name="param_nitrate_placeholder">Enter value</string>
+    <string name="param_nitrate_hint">Safe range: Below 100 mg/L for aquaculture</string>
+    <string name="param_turbidity_label">Turbidity (NTU)</string>
+    <string name="param_turbidity_placeholder">Enter value</string>
+    <string name="param_turbidity_hint">Normal range: 30-60 NTU for pond aquaculture</string>
+
+    <!-- Location Permission -->
+    <string name="location_permission_required">Location Permission Required</string>
+    <string name="location_permission_message">Location data helps improve predictions and analytics. Grant permission to capture GPS coordinates with your data entries.</string>
+    <string name="location_permission_grant">Grant Permission</string>
+    <string name="location_permission_denied">Location permission denied. You can still save data without location information.</string>
+    <string name="location_current_description">Get real-time GPS coordinates</string>
+    <string name="location_last_known_description">Automatically uses previously recorded position</string>
+    <string name="location_capturing">Capturing location…</string>
+    <string name="location_lat_format">Latitude: %.6f</string>
+    <string name="location_lon_format">Longitude: %.6f</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_pond">Pond Configuration</string>
+    <string name="settings_section_account">Account</string>
+    <string name="settings_section_data">Data Management</string>
+    <string name="settings_pond_name_label">Pond Name</string>
+    <string name="settings_pond_name_placeholder">Enter pond name</string>
+    <string name="settings_species_label">Fish Species</string>
+    <string name="settings_species_placeholder">Select species</string>
+    <string name="settings_stock_count_label">Stock Count</string>
+    <string name="settings_stock_count_placeholder">Enter number of fish</string>
+    <string name="settings_start_date_label">Start Date</string>
+    <string name="settings_start_date_placeholder">Select date</string>
+    <string name="settings_forecast_horizon_label">Forecast Horizon (days)</string>
+    <string name="settings_forecast_horizon_placeholder">Enter days</string>
+    <string name="settings_save_config">Save Configuration</string>
+    <string name="settings_sync_data">Sync Data</string>
+    <string name="settings_sign_in_required">Sign in required</string>
+    <string name="settings_syncing">Syncing…</string>
+    <string name="settings_sync_checking">Checking for unsynced data…</string>
+    <string name="settings_sync_count">Syncing %1$d entries…</string>
+    <string name="settings_sync_success">Successfully synced %1$d entries</string>
+    <string name="settings_sync_no_data">No new data to sync</string>
+    <string name="settings_sync_preparing">Preparing to sync…</string>
+    <string name="settings_offline_mode">Offline Mode</string>
+    <string name="settings_offline_mode_on">Currently offline. Data will sync when online.</string>
+    <string name="settings_section_model">ML Model</string>
+    <string name="settings_model_version_label">Current Version</string>
+    <string name="settings_check_model_update">Check for Updates</string>
+    <string name="settings_update_model">Update Model</string>
+    <string name="settings_model_checking">Checking…</string>
+    <string name="settings_model_updating">Downloading…</string>
+
+    <!-- Pond Management -->
+    <string name="pond_selector_label">Select Pond</string>
+    <string name="pond_selector_placeholder">Choose a pond</string>
+
+    <!-- Report Death Dialog -->
+    <string name="dialog_report_deaths_title">Report Fish Deaths</string>
+    <string name="dialog_report_deaths_message">Enter the number of fish that have died. This will update the stock count accordingly.</string>
+    <string name="dialog_report_deaths_label">Number of Deaths</string>
+    <string name="dialog_report_deaths_placeholder">Enter number</string>
+    <string name="dialog_report_deaths_error">Please enter a valid number</string>
+
+    <!-- Harvest Confirmation Dialog -->
+    <string name="dialog_harvest_title">Mark Pond as Harvested?</string>
+    <string name="dialog_harvest_message">You are about to mark \"%1$s\" as harvested.</string>
+    <string name="dialog_harvest_warning_title">Warning:</string>
+    <string name="dialog_harvest_warning_items">• This pond will become read-only\n• No new data can be added\n• Can only be reversed from Pond Management</string>
+    <string name="dialog_harvest_confirm">Confirm Harvest</string>
+
+    <!-- Prediction Verification Dialog -->
+    <string name="dialog_verify_prediction_title">Verify Prediction Accuracy</string>
+    <string name="dialog_verify_prediction_message">Based on your water quality data, we predict:</string>
+    <string name="dialog_verify_prediction_weight">Weight: %.2f kg</string>
+    <string name="dialog_verify_prediction_length">Length: %.2f cm</string>
+    <string name="dialog_verify_prediction_question">Are these predictions close to your actual measurements?</string>
+    <string name="dialog_verify_accurate">Yes, Accurate</string>
+    <string name="dialog_verify_inaccurate">No, Needs Adjustment</string>
+
+    <!-- Auth Screen -->
+    <string name="auth_title">Welcome to AquaForecast</string>
+    <string name="auth_subtitle">Smart aquaculture management</string>
+    <string name="auth_email_label">Email</string>
+    <string name="auth_email_placeholder">Enter your email</string>
+    <string name="auth_password_label">Password</string>
+    <string name="auth_password_placeholder">Enter your password</string>
+    <string name="auth_login">Login</string>
+    <string name="auth_signup">Sign Up</string>
+    <string name="auth_google_signin">Sign in with Google</string>
+    <string name="auth_forgot_password">Forgot Password?</string>
+    <string name="auth_no_account">Don\'t have an account?</string>
+    <string name="auth_have_account">Already have an account?</string>
+
+    <!-- Errors and Messages -->
+    <string name="error_generic">An error occurred. Please try again.</string>
+    <string name="error_network">Network error. Please check your internet connection.</string>
+    <string name="error_auth_failed">Authentication failed</string>
+    <string name="error_invalid_input">Please fill in all required fields</string>
+    <string name="success_data_saved">Data saved successfully</string>
+    <string name="success_config_saved">Configuration saved successfully</string>
+    <string name="success_sync_complete">Sync completed</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_data_entry">Data Entry</string>
+    <string name="nav_schedule">Schedule</string>
+    <string name="nav_predictions">Predictions</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Units and Formats -->
+    <string name="unit_celsius">°C</string>
+    <string name="unit_mg_per_l">mg/L</string>
+    <string name="unit_ntu">NTU</string>
+    <string name="unit_kg">kg</string>
+    <string name="unit_cm">cm</string>
+    <string name="format_percentage">%1$d%%</string>
+    <string name="format_kg">%.2f kg</string>
+    <string name="format_cm">%.2f cm</string>
+
+    <!-- Content Descriptions (for accessibility) -->
+    <string name="cd_refresh">Refresh</string>
+    <string name="cd_sync">Sync</string>
+    <string name="cd_settings">Settings</string>
+    <string name="cd_error">Error</string>
+    <string name="cd_warning">Warning</string>
+    <string name="cd_info">Information</string>
+    <string name="cd_check">Check</string>
+    <string name="cd_harvested">Harvested</string>
 </resources>

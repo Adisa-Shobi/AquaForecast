@@ -162,10 +162,9 @@ class DashboardViewModel(
         val currentPrediction = _state.value.latestPrediction
         val horizonDays = _state.value.forecastHorizonDays
 
-        // If no prediction exists, clear projections and try to generate one
+        // If no prediction exists, clear projections (user needs to make a data entry)
         if (currentPrediction == null) {
             _state.update { it.copy(growthProjections = emptyList()) }
-            generateNewPrediction()
             return
         }
 
@@ -188,45 +187,6 @@ class DashboardViewModel(
         }
 
         _state.update { it.copy(growthProjections = projections) }
-    }
-
-    fun generateNewPrediction() {
-        viewModelScope.launch {
-            val pond = _state.value.pond ?: return@launch
-
-            _state.update { it.copy(isRefreshing = true) }
-
-            mlPredictor.predict(pond)
-                .onSuccess { prediction ->
-                    // Save prediction to database
-                    predictionRepository.save(prediction)
-                        .onSuccess {
-                            _state.update { it.copy(latestPrediction = prediction) }
-                            generateGrowthProjections()
-                        }
-                }
-                .onError { message ->
-                    _state.update { it.copy(error = message) }
-                }
-
-            _state.update { it.copy(isRefreshing = false) }
-        }
-    }
-
-    fun refresh() {
-        viewModelScope.launch {
-            _state.update { it.copy(isRefreshing = true) }
-
-            // Generate new prediction and reload data
-            generateNewPrediction()
-
-            val pondId = _state.value.pond?.id?.toString()
-            if (pondId != null) {
-                loadPondData(pondId)
-            }
-
-            _state.update { it.copy(isRefreshing = false) }
-        }
     }
 
     fun dismissError() {

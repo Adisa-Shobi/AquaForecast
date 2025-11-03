@@ -11,6 +11,7 @@ import com.example.aquaforecast.domain.repository.getOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.tensorflow.lite.Interpreter
+import java.io.File
 import java.io.FileInputStream
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
@@ -29,6 +30,7 @@ class MLPredictor(
 
     companion object {
         private const val MODEL_FILE_NAME = "aqua_forecast_model.tflite"
+        private const val MODEL_DIR = "models"
 
         // Model output indices
         private const val OUTPUT_WEIGHT_INDEX = 0
@@ -38,11 +40,25 @@ class MLPredictor(
         // Default weights for harvest readiness (in kg)
         private const val TILAPIA_HARVEST_WEIGHT = 0.5  // 500g
         private const val CATFISH_HARVEST_WEIGHT = 1.0  // 1kg
+
+        // Conversion constants
+        private const val GRAMS_TO_KG = 1000.0
+
+        // Growth estimation (simplified - based on typical aquaculture data)
+        private const val GROWTH_RATE_PER_DAY_KG = 0.01
+
+        // Confidence calculation constants
+        private const val MIN_CONFIDENCE = 0.5
+        private const val MAX_CONFIDENCE = 0.95
+        private const val HISTORICAL_WINDOW_DAYS = 7.0
+        private const val CONSISTENCY_WEIGHT = 0.6
+        private const val COMPLETENESS_WEIGHT = 0.4
     }
 
     /**
-     * Initialize the TFLite interpreter by loading the model from assets
-     * Should be called before making predictions
+     * Initialize the TFLite interpreter by loading the model
+     * Tries to load downloaded model from internal storage first,
+     * falls back to bundled model in assets if not available.
      */
     suspend fun initialize(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
@@ -88,19 +104,6 @@ class MLPredictor(
                 pond = pond
             )
 
-            Log.d(TAG, "========== PREDICTION INPUT ==========")
-            Log.d(TAG, "Pond: ${pond.name} (ID: ${pond.id}, Species: ${pond.species})")
-            Log.d(TAG, "Stock Count: ${pond.stockCount}")
-            Log.d(TAG, "Latest Data:")
-            Log.d(TAG, "  - Temperature: ${latestData.temperature}°C")
-            Log.d(TAG, "  - pH: ${latestData.ph}")
-            Log.d(TAG, "  - Dissolved Oxygen: ${latestData.dissolvedOxygen} mg/L")
-            Log.d(TAG, "  - Ammonia: ${latestData.ammonia} ppm")
-            Log.d(TAG, "  - Nitrate: ${latestData.nitrate} ppm")
-            Log.d(TAG, "  - Turbidity: ${latestData.turbidity} NTU")
-            Log.d(TAG, "Historical Data Points: ${historicalData.size}")
-            Log.d(TAG, "Preprocessed Features (scaled): ${features.contentToString()}")
-
             // Run inference
             val outputs = runInference(features)
                 ?: return@withContext Result.Error("Inference failed")
@@ -110,12 +113,7 @@ class MLPredictor(
             val predictedLength = outputs[OUTPUT_LENGTH_INDEX].toDouble()
 
             // Convert weight from grams to kg for internal use
-            val predictedWeight = predictedWeightGrams / 1000.0
-
-            Log.d(TAG, "========== PREDICTION OUTPUT ==========")
-            Log.d(TAG, "Model Output:")
-            Log.d(TAG, "  - Weight: ${predictedWeightGrams}g (${predictedWeight}kg)")
-            Log.d(TAG, "  - Length: ${predictedLength}cm")
+            val predictedWeight = predictedWeightGrams / GRAMS_TO_KG
 
             // Calculate harvest date based on predicted weight
             val harvestDate = calculateHarvestDate(
@@ -166,7 +164,7 @@ class MLPredictor(
 
             return outputArray[0]
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Inference failed", e)
             return null
         }
     }
@@ -196,28 +194,28 @@ class MLPredictor(
         }
 
         // Estimate days until harvest based on growth rate
-        // This is a simplified calculation - adjust based on your model's predictions
+        // Note: Growth rate is simplified estimate based on typical aquaculture data
         val weightDeficit = targetWeight - currentWeight
-        val growthRatePerDay = 0.01 // TODO: Find a scientifically backed way to calculate this
-        val daysUntilHarvest = (weightDeficit / growthRatePerDay).toLong()
+        val daysUntilHarvest = (weightDeficit / GROWTH_RATE_PER_DAY_KG).toLong()
 
         return latestData.timestamp + TimeUnit.DAYS.toMillis(daysUntilHarvest)
     }
 
     /**
      * Calculate prediction confidence score based on data quality and consistency
+     * Confidence is calculated from data consistency (dissolved oxygen variance)
+     * and completeness (number of historical data points)
      *
      * @param predictedWeight Predicted weight from model
      * @param historicalData Historical farm data
-     * @return Confidence score (0.0 - 1.0)
+     * @return Confidence score (MIN_CONFIDENCE - MAX_CONFIDENCE)
      */
-    // TODO: Improve the algorithm
     private fun calculateConfidence(
         predictedWeight: Double,
         historicalData: List<FarmData>
     ): Double {
         if (historicalData.isEmpty()) {
-            return 0.5 // Low confidence with no historical data
+            return MIN_CONFIDENCE
         }
 
         // Calculate data consistency (lower variance = higher confidence)
@@ -230,18 +228,32 @@ class MLPredictor(
         val consistencyScore = 1.0 - (doStdDev / doMean).coerceIn(0.0, 1.0)
 
         // Data completeness score
-        val completenessScore = (historicalData.size / 7.0).coerceIn(0.0, 1.0)
+        val completenessScore = (historicalData.size / HISTORICAL_WINDOW_DAYS).coerceIn(0.0, 1.0)
 
         // Weighted average
-        return (consistencyScore * 0.6 + completenessScore * 0.4).coerceIn(0.5, 0.95)
+        return (consistencyScore * CONSISTENCY_WEIGHT + completenessScore * COMPLETENESS_WEIGHT)
+            .coerceIn(MIN_CONFIDENCE, MAX_CONFIDENCE)
     }
 
     /**
-     * Load TFLite model file from assets folder
+     * Load TFLite model file
+     * Tries downloaded model first, falls back to bundled model in assets
      *
      * @return MappedByteBuffer containing the model
      */
     private fun loadModelFile(): MappedByteBuffer {
+        // Check for downloaded model in internal storage
+        val downloadedModel = File(context.filesDir, "$MODEL_DIR/$MODEL_FILE_NAME")
+
+        if (downloadedModel.exists()) {
+            Log.i(TAG, "Loading downloaded model from: ${downloadedModel.absolutePath}")
+            val inputStream = FileInputStream(downloadedModel)
+            val fileChannel = inputStream.channel
+            return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, downloadedModel.length())
+        }
+
+        // Fall back to bundled model in assets
+        Log.i(TAG, "Loading bundled model from assets")
         val fileDescriptor = context.assets.openFd(MODEL_FILE_NAME)
         val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
         val fileChannel = inputStream.channel

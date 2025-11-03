@@ -25,16 +25,18 @@ android {
         debug {
             isDebuggable = true
 
-            buildConfigField("String", "API_BASE_URL", "\"https://aquaforecast.onrender.com/\"")
+            // Local development API URL - connects to API running on host machine
+            // Physical device connects to: http://192.168.1.67:8000
+            buildConfigField("String", "API_BASE_URL", "\"https://aquaforecast-api.graymeadow-ed008687.westus2.azurecontainerapps.io/\"")
             buildConfigField("Boolean", "ENABLE_DATABASE_BOOTSTRAP", "true")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("String", "API_BASE_URL", "\"https://aquaforecast.onrender.com/\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://aquaforecast-api.graymeadow-ed008687.westus2.azurecontainerapps.io/\"")
             buildConfigField("Boolean", "ENABLE_DATABASE_BOOTSTRAP", "false")
         }
     }
@@ -60,6 +62,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.firebase.ml.modeldownloader)
     implementation(libs.tensorflow.lite)

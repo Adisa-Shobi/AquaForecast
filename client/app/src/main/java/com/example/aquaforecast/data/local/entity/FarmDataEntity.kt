@@ -23,5 +23,7 @@ data class FarmDataEntity (
     val turbidity: Double,
     val timestamp: Long,
     val pondId: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     val isSynced: Boolean = false
 )
