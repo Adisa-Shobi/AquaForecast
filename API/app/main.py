@@ -10,6 +10,7 @@ import time
 
 from app.core.config import settings
 from app.core.database import engine, Base
+from app.core.startup import run_startup_tasks
 from app.api.v1.router import api_router
 from app.schemas.common import HealthResponse
 from app.middleware.error_handler import (
@@ -45,6 +46,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to create database tables: {e}")
         raise
+
+    # Run startup tasks (baseline model initialization, etc.)
+    run_startup_tasks()
 
     yield
 

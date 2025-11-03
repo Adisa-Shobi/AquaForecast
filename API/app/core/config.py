@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     HOST: str = Field(default="0.0.0.0", description="Server host")
     PORT: int = Field(default=8000, description="Server port")
 
+    # Cloudinary
+    CLOUDINARY_CLOUD_NAME: str = Field(default="", description="Cloudinary cloud name")
+    CLOUDINARY_API_KEY: str = Field(default="", description="Cloudinary API key")
+    CLOUDINARY_API_SECRET: str = Field(default="", description="Cloudinary API secret")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

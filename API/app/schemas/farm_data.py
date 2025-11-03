@@ -12,15 +12,20 @@ class LocationData(BaseModel):
 
 
 class FarmDataReading(BaseModel):
-    """Single water quality reading with fish measurements."""
-    temperature: float = Field(..., ge=0, le=50, description="Temperature in °C")
-    ph: float = Field(..., ge=0, le=14, description="pH level")
-    dissolved_oxygen: float = Field(..., ge=0, le=20, description="Dissolved oxygen in mg/L")
-    ammonia: float = Field(..., ge=0, le=10, description="Ammonia in mg/L")
-    nitrate: float = Field(..., ge=0, le=100, description="Nitrate in mg/L")
-    turbidity: float = Field(..., ge=0, le=1000, description="Turbidity in NTU")
-    fish_weight: Optional[float] = Field(None, ge=0, le=100, description="Fish weight in kilograms (kg)")
-    fish_length: Optional[float] = Field(None, ge=0, le=500, description="Fish length in cm")
+    """Single water quality reading with fish measurements.
+
+    Note: Range validation is intentionally removed for sync endpoint.
+    Data is validated at collection time on mobile app, not at sync time.
+    This ensures real-world readings (which may exceed typical ranges) are preserved.
+    """
+    temperature: float = Field(..., description="Temperature in °C")
+    ph: float = Field(..., description="pH level")
+    dissolved_oxygen: float = Field(..., description="Dissolved oxygen in mg/L")
+    ammonia: float = Field(..., description="Ammonia in mg/L")
+    nitrate: float = Field(..., description="Nitrate in mg/L")
+    turbidity: float = Field(..., description="Turbidity in NTU")
+    fish_weight: Optional[float] = Field(None, description="Fish weight in kilograms (kg)")
+    fish_length: Optional[float] = Field(None, description="Fish length in cm")
     verified: bool = Field(default=False, description="User confirmed fish measurements are accurate")
     start_date: Optional[str] = Field(None, description="Pond cycle start date (YYYY-MM-DD)")
     location: LocationData
