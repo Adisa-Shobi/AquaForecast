@@ -5,7 +5,11 @@ import { Loader2, CheckCircle, XCircle, Clock, WifiOff } from 'lucide-react';
 import { auth } from '../config/firebase';
 import { EventSourceWithHeaders } from '../utils/EventSource';
 
-export default function TrainingProgress() {
+interface TrainingProgressProps {
+  onTaskComplete?: () => void;
+}
+
+export default function TrainingProgress({ onTaskComplete }: TrainingProgressProps) {
   const [tasks, setTasks] = useState<TrainingTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
@@ -80,7 +84,14 @@ export default function TrainingProgress() {
             if (existingIndex >= 0) {
               // Update existing task
               const newTasks = [...prevTasks];
+              const previousStatus = newTasks[existingIndex].status;
               newTasks[existingIndex] = taskUpdate;
+
+              // If task just completed, trigger refresh
+              if (previousStatus !== 'completed' && taskUpdate.status === 'completed') {
+                onTaskComplete?.();
+              }
+
               return newTasks;
             } else {
               // Add new task at the beginning

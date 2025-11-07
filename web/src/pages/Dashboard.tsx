@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { modelApi } from '../api/client';
 import type { ModelListResponse, ModelVersion } from '../types/model';
 import {
@@ -37,9 +37,31 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [includeArchived, setIncludeArchived] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     loadModels();
+  }, [includeArchived]);
+
+  // Refresh when navigating back with refresh state
+  useEffect(() => {
+    if (location.state?.refresh) {
+      loadModels();
+      // Clear the state to prevent refresh on next visit
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
+  // Refresh data when component becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadModels();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [includeArchived]);
 
   const loadModels = async () => {
@@ -96,7 +118,7 @@ export default function Dashboard() {
       </div>
 
       {/* Training Progress */}
-      <TrainingProgress />
+      <TrainingProgress onTaskComplete={() => loadModels()} />
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
