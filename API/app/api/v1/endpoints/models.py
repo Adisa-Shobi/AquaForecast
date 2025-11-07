@@ -3,6 +3,7 @@
 import logging
 import asyncio
 import json
+import threading
 from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
@@ -29,15 +30,16 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _run_training_task(train_params: dict):
+def _run_training_task_in_thread(train_params: dict, event_loop):
     """
-    Background training task that runs synchronously in a thread pool.
+    Training task that runs in a completely separate daemon thread.
 
-    This function is called by FastAPI's BackgroundTasks and runs in a
-    separate thread, keeping the API responsive during training.
+    This function runs outside the FastAPI event loop entirely,
+    ensuring the web server remains fully responsive.
     """
     from app.core.database import SessionLocal
     from app.models.training_task import TrainingTask, TrainingTaskStatus
+    from app.core.events import training_events
     from datetime import datetime
 
     task_id = train_params["task_id"]
@@ -52,7 +54,19 @@ def _run_training_task(train_params: dict):
             task_record.current_stage = "Initializing training"
             task_db.commit()
 
-        # Run the actual training
+        logger.info(f"Training task {task_id} starting in background thread")
+
+        # Notify SSE streams that training has started
+        if event_loop:
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    training_events.notify_training_started(str(task_id)),
+                    event_loop
+                )
+            except Exception as e:
+                logger.warning(f"Failed to notify training started: {e}")
+
+        # Run the actual training with event loop for cross-thread SSE notifications
         new_model = ModelTrainingService.train_model(
             db=task_db,
             base_model_id=train_params["base_model_id"],
@@ -63,7 +77,7 @@ def _run_training_task(train_params: dict):
             learning_rate=train_params["learning_rate"],
             notes=train_params["notes"],
             task_id=task_id,
-            event_loop=None,  # No event loop in sync context
+            event_loop=event_loop,  # Pass event loop for cross-thread SSE notifications
         )
 
         # Update task status to COMPLETED
@@ -78,6 +92,16 @@ def _run_training_task(train_params: dict):
 
         logger.info(f"Model {new_model.version} trained successfully")
 
+        # Notify SSE streams that training has completed
+        if event_loop:
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    training_events.notify_training_completed(str(task_id)),
+                    event_loop
+                )
+            except Exception as e:
+                logger.warning(f"Failed to notify training completed: {e}")
+
     except Exception as e:
         logger.error(f"Training failed: {str(e)}", exc_info=True)
         task_record = task_db.query(TrainingTask).filter(TrainingTask.id == task_id).first()
@@ -86,6 +110,16 @@ def _run_training_task(train_params: dict):
             task_record.completed_at = datetime.utcnow()
             task_record.error_message = str(e)
             task_db.commit()
+
+        # Notify SSE streams that training has failed
+        if event_loop:
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    training_events.notify_training_completed(str(task_id)),
+                    event_loop
+                )
+            except Exception as e:
+                logger.warning(f"Failed to notify training completion: {e}")
     finally:
         task_db.close()
 
@@ -321,9 +355,8 @@ def get_model_metrics(
     description="Train a new model based on an existing base model using unused farm data.",
     status_code=status.HTTP_202_ACCEPTED,
 )
-def retrain_model(
+async def retrain_model(
     request: RetrainRequest,
-    background_tasks: BackgroundTasks,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> SuccessResponse:
@@ -389,12 +422,23 @@ def retrain_model(
             "task_id": str(task_id),
         }
 
-        # Start training in background using sync function
-        # This ensures FastAPI doesn't wait for completion
-        background_tasks.add_task(
-            _run_training_task,
-            train_params
+        # Get event loop for cross-thread notifications
+        try:
+            event_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            event_loop = None
+            logger.warning("No event loop available for training notifications")
+
+        # Start training in a completely separate daemon thread
+        # This ensures the response returns immediately without waiting
+        training_thread = threading.Thread(
+            target=_run_training_task_in_thread,
+            args=(train_params, event_loop),
+            daemon=True,  # Daemon thread won't prevent app shutdown
+            name=f"training-{task_id}"
         )
+        training_thread.start()
+        logger.info(f"Training thread started for task {task_id}")
 
         return SuccessResponse(
             success=True,

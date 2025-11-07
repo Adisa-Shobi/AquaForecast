@@ -49,6 +49,7 @@ class SyncRepositoryImpl(
         private const val SYNC_PREFS = "sync_prefs"
         private const val MODEL_VERSION_KEY = "model_version"
         private const val MODEL_PREFS = "model_prefs"
+        private const val BATCH_SIZE = 100 // Backend accepts max 100 entries per request
     }
 
     override suspend fun syncData(): Result<Int> = withContext(Dispatchers.IO) {
@@ -142,42 +143,69 @@ class SyncRepositoryImpl(
                 android.provider.Settings.Secure.ANDROID_ID
             )
 
-            // Create sync request
-            val request = FarmDataSyncRequest(
-                deviceId = deviceId,
-                readings = readings
-            )
+            // Split readings into batches of BATCH_SIZE
+            val batches = readings.chunked(BATCH_SIZE)
+            val entityBatches = unsyncedEntities.chunked(BATCH_SIZE)
 
-            // Upload to backend
-            val response = apiService.syncFarmData("Bearer $token", request)
+            Log.d(TAG, "Syncing ${readings.size} entries in ${batches.size} batch(es)")
 
-            if (response.isSuccessful) {
-                val body = response.body()
+            var totalSyncedCount = 0
+            val syncedEntityIds = mutableListOf<Long>()
 
-                if (body == null) {
-                    Log.e(TAG, "Sync response body is null")
-                    return@withContext "Sync failed: Empty response from server".asError()
+            // Upload each batch
+            for ((batchIndex, batch) in batches.withIndex()) {
+                try {
+                    Log.d(TAG, "Uploading batch ${batchIndex + 1}/${batches.size} (${batch.size} entries)")
+
+                    // Create sync request for this batch
+                    val request = FarmDataSyncRequest(
+                        deviceId = deviceId,
+                        readings = batch
+                    )
+
+                    // Upload to backend
+                    val response = apiService.syncFarmData("Bearer $token", request)
+
+                    if (response.isSuccessful) {
+                        val body = response.body()
+
+                        if (body == null) {
+                            Log.e(TAG, "Batch ${batchIndex + 1} sync response body is null")
+                            continue // Try next batch
+                        }
+
+                        if (body.success && body.data != null) {
+                            // Track synced entities from this batch
+                            val batchEntityIds = entityBatches[batchIndex].map { it.id }
+                            syncedEntityIds.addAll(batchEntityIds)
+                            totalSyncedCount += body.data.syncedCount
+
+                            Log.d(TAG, "Batch ${batchIndex + 1} synced: ${body.data.syncedCount} entries")
+                        } else {
+                            val errorMsg = body.error?.message ?: "Unknown error"
+                            Log.e(TAG, "Batch ${batchIndex + 1} failed: $errorMsg")
+                            // Continue with next batch
+                        }
+                    } else {
+                        val errorMsg = "HTTP ${response.code()}: ${response.message()}"
+                        Log.e(TAG, "Batch ${batchIndex + 1} failed: $errorMsg")
+                        // Continue with next batch
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error syncing batch ${batchIndex + 1}: ${e.message}", e)
+                    // Continue with next batch
                 }
+            }
 
-                if (body.success && body.data != null) {
-                    // Mark entries as synced
-                    val ids = unsyncedEntities.map { it.id }
-                    farmDataDao.markAsSynced(ids)
-
-                    // Save sync timestamp
-                    saveSyncTime()
-
-                    Log.d(TAG, "Successfully synced ${body.data.syncedCount} entries")
-                    body.data.syncedCount.asSuccess()
-                } else {
-                    val errorMsg = body.error?.message ?: "Unknown error"
-                    Log.e(TAG, "Sync failed: $errorMsg")
-                    "Sync failed: $errorMsg".asError()
-                }
+            // Mark successfully synced entries
+            if (syncedEntityIds.isNotEmpty()) {
+                farmDataDao.markAsSynced(syncedEntityIds)
+                saveSyncTime()
+                Log.d(TAG, "Successfully synced $totalSyncedCount entries across ${batches.size} batch(es)")
+                totalSyncedCount.asSuccess()
             } else {
-                val errorMsg = "HTTP ${response.code()}: ${response.message()}"
-                Log.e(TAG, "Sync failed: $errorMsg")
-                "Sync failed: $errorMsg".asError()
+                Log.e(TAG, "Failed to sync any batches")
+                "Failed to sync data. Please try again later.".asError()
             }
         } catch (e: HttpException) {
             val errorMsg = "HTTP error ${e.code()}: ${e.message()}"

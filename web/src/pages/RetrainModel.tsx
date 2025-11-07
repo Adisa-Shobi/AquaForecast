@@ -49,7 +49,7 @@ export default function RetrainModel() {
         `Estimated duration: ~${response.estimated_duration_minutes} minutes\n\n` +
         `Check the dashboard to track progress.`
       );
-      navigate('/');
+      navigate('/', { state: { refresh: true } });
     } catch (error: any) {
       alert(`Failed to start retraining: ${error.response?.data?.detail || error.message}`);
     } finally {
