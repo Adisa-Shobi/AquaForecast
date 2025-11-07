@@ -27,7 +27,7 @@ android {
 
             // Local development API URL - connects to API running on host machine
             // Physical device connects to: http://192.168.1.67:8000
-            buildConfigField("String", "API_BASE_URL", "\"https://aquaforecast-api.graymeadow-ed008687.westus2.azurecontainerapps.io/\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://aquaforecast.duckdns.org/\"")
             buildConfigField("Boolean", "ENABLE_DATABASE_BOOTSTRAP", "true")
         }
         release {
@@ -36,7 +36,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("String", "API_BASE_URL", "\"https://aquaforecast-api.graymeadow-ed008687.westus2.azurecontainerapps.io/\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://aquaforecast.duckdns.org/\"")
             buildConfigField("Boolean", "ENABLE_DATABASE_BOOTSTRAP", "false")
         }
     }
