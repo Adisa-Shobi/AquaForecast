@@ -36,11 +36,30 @@ def _run_training_task_in_thread(train_params: dict, event_loop):
 
     This function runs outside the FastAPI event loop entirely,
     ensuring the web server remains fully responsive.
+
+    Resource limits are applied to prevent training from monopolizing CPU.
     """
+    import os
+    import sys
     from app.core.database import SessionLocal
     from app.models.training_task import TrainingTask, TrainingTaskStatus
     from app.core.events import training_events
     from datetime import datetime
+
+    # Limit TensorFlow to use fewer CPU threads to leave resources for API
+    # This prevents training from monopolizing all CPU cores
+    os.environ['TF_NUM_INTRAOP_THREADS'] = '2'  # Limit parallel ops within a single operation
+    os.environ['TF_NUM_INTEROP_THREADS'] = '2'  # Limit parallel independent operations
+    os.environ['OMP_NUM_THREADS'] = '2'  # Limit OpenMP threads
+
+    # Lower thread priority on Unix systems
+    try:
+        import os
+        if hasattr(os, 'nice'):
+            os.nice(10)  # Lower priority (higher nice value = lower priority)
+            logger.info(f"Training thread priority lowered (nice +10)")
+    except Exception as e:
+        logger.warning(f"Could not lower thread priority: {e}")
 
     task_id = train_params["task_id"]
     task_db = SessionLocal()
@@ -671,6 +690,10 @@ async def stream_training_progress(
 
         last_states = {}  # Track last known state of each task
 
+        # Send initial comment to establish connection immediately
+        # This prevents buffering issues on DigitalOcean/CloudFlare
+        yield ": ping\n\n"
+
         try:
             while True:
                 # Wait for a training event or timeout after 30 seconds
@@ -738,9 +761,14 @@ async def stream_training_progress(
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",  # Disable nginx buffering
+            "Content-Type": "text/event-stream",
+            "Transfer-Encoding": "chunked",
+            # CORS headers for SSE
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Credentials": "true",
         }
     )
 

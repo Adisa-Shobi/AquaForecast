@@ -68,3 +68,6 @@ logs/
 
 # Alembic
 alembic/versions/*.pyc
+
+# Deployment guide
+DROPLET_DEPLOYMENT.md
