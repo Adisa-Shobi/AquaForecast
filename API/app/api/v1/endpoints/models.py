@@ -29,6 +29,67 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _run_training_task(train_params: dict):
+    """
+    Background training task that runs synchronously in a thread pool.
+
+    This function is called by FastAPI's BackgroundTasks and runs in a
+    separate thread, keeping the API responsive during training.
+    """
+    from app.core.database import SessionLocal
+    from app.models.training_task import TrainingTask, TrainingTaskStatus
+    from datetime import datetime
+
+    task_id = train_params["task_id"]
+    task_db = SessionLocal()
+
+    try:
+        # Update task status to RUNNING
+        task_record = task_db.query(TrainingTask).filter(TrainingTask.id == task_id).first()
+        if task_record:
+            task_record.status = TrainingTaskStatus.RUNNING
+            task_record.started_at = datetime.utcnow()
+            task_record.current_stage = "Initializing training"
+            task_db.commit()
+
+        # Run the actual training
+        new_model = ModelTrainingService.train_model(
+            db=task_db,
+            base_model_id=train_params["base_model_id"],
+            new_version=train_params["new_version"],
+            user_id=train_params["user_id"],
+            epochs=train_params["epochs"],
+            batch_size=train_params["batch_size"],
+            learning_rate=train_params["learning_rate"],
+            notes=train_params["notes"],
+            task_id=task_id,
+            event_loop=None,  # No event loop in sync context
+        )
+
+        # Update task status to COMPLETED
+        task_record = task_db.query(TrainingTask).filter(TrainingTask.id == task_id).first()
+        if task_record:
+            task_record.status = TrainingTaskStatus.COMPLETED
+            task_record.completed_at = datetime.utcnow()
+            task_record.result_model_id = new_model.id
+            task_record.progress_percentage = 100.0
+            task_record.current_stage = "Training completed"
+            task_db.commit()
+
+        logger.info(f"Model {new_model.version} trained successfully")
+
+    except Exception as e:
+        logger.error(f"Training failed: {str(e)}", exc_info=True)
+        task_record = task_db.query(TrainingTask).filter(TrainingTask.id == task_id).first()
+        if task_record:
+            task_record.status = TrainingTaskStatus.FAILED
+            task_record.completed_at = datetime.utcnow()
+            task_record.error_message = str(e)
+            task_db.commit()
+    finally:
+        task_db.close()
+
+
 @router.get(
     "/latest",
     response_model=SuccessResponse,
@@ -260,7 +321,7 @@ def get_model_metrics(
     description="Train a new model based on an existing base model using unused farm data.",
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def retrain_model(
+def retrain_model(
     request: RetrainRequest,
     background_tasks: BackgroundTasks,
     db: Annotated[Session, Depends(get_db)],
@@ -316,85 +377,24 @@ async def retrain_model(
 
         task_id = task.id
 
-        # Start training in background thread (not event loop)
-        async def train_in_background():
-            """
-            Background training task - runs in separate thread pool.
+        # Capture request parameters for background task
+        train_params = {
+            "base_model_id": request.base_model_id,
+            "new_version": request.new_version,
+            "user_id": str(current_user.id),
+            "epochs": request.epochs,
+            "batch_size": request.batch_size,
+            "learning_rate": request.learning_rate,
+            "notes": request.notes,
+            "task_id": str(task_id),
+        }
 
-            Uses asyncio.to_thread() to run blocking ML training without blocking
-            the FastAPI event loop, allowing the API to remain responsive.
-            """
-            import asyncio
-            from app.core.database import SessionLocal
-            from app.core.events import training_events
-
-            # Get reference to current event loop for cross-thread notifications
-            loop = asyncio.get_running_loop()
-
-            def run_training():
-                """Synchronous training function that runs in a separate thread."""
-                # Create dedicated session for this training task
-                task_db = SessionLocal()
-                try:
-                    task_record = task_db.query(TrainingTask).filter(TrainingTask.id == task_id).first()
-                    if task_record:
-                        task_record.status = TrainingTaskStatus.RUNNING
-                        task_record.started_at = datetime.utcnow()
-                        task_record.current_stage = "Initializing training"
-                        task_db.commit()
-
-                    # Pass event loop reference for progress notifications
-                    new_model = ModelTrainingService.train_model(
-                        db=task_db,
-                        base_model_id=request.base_model_id,
-                        new_version=request.new_version,
-                        user_id=str(current_user.id),
-                        epochs=request.epochs,
-                        batch_size=request.batch_size,
-                        learning_rate=request.learning_rate,
-                        notes=request.notes,
-                        task_id=str(task_id),
-                        event_loop=loop,
-                    )
-
-                    task_record = task_db.query(TrainingTask).filter(TrainingTask.id == task_id).first()
-                    if task_record:
-                        task_record.status = TrainingTaskStatus.COMPLETED
-                        task_record.completed_at = datetime.utcnow()
-                        task_record.result_model_id = new_model.id
-                        task_record.progress_percentage = 100.0
-                        task_record.current_stage = "Training completed"
-                        task_db.commit()
-
-                    logger.info(f"Model {new_model.version} trained successfully")
-                    return new_model
-                except Exception as e:
-                    logger.error(f"Training failed: {str(e)}", exc_info=True)
-                    task_record = task_db.query(TrainingTask).filter(TrainingTask.id == task_id).first()
-                    if task_record:
-                        task_record.status = TrainingTaskStatus.FAILED
-                        task_record.completed_at = datetime.utcnow()
-                        task_record.error_message = str(e)
-                        task_db.commit()
-                    raise
-                finally:
-                    task_db.close()
-
-            # Notify that training has started
-            await training_events.notify_training_started(str(task_id))
-
-            # Run the blocking training function in a separate thread
-            # This prevents blocking the FastAPI event loop
-            try:
-                await asyncio.to_thread(run_training)
-                # Notify that training has completed
-                await training_events.notify_training_completed(str(task_id))
-            except Exception as e:
-                # Notify that training has failed
-                await training_events.notify_training_completed(str(task_id))
-                logger.error(f"Background training task failed: {str(e)}")
-
-        background_tasks.add_task(train_in_background)
+        # Start training in background using sync function
+        # This ensures FastAPI doesn't wait for completion
+        background_tasks.add_task(
+            _run_training_task,
+            train_params
+        )
 
         return SuccessResponse(
             success=True,
