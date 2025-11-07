@@ -15,15 +15,14 @@ echo "Building multi-stage image: $TAGGED_IMAGE"
 DOCKER_BUILDKIT=1 docker build \
     --platform linux/amd64 \
     --build-arg BUILDKIT_INLINE_CACHE=1 \
-    -t "$TAGGED_IMAGE" \
     -t "$LATEST_IMAGE" \
     .
 
 echo "Pushing $LATEST_IMAGE"
 docker push "$LATEST_IMAGE"
 
-echo "Pushing $TAGGED_IMAGE"
-docker push "$TAGGED_IMAGE"
+# echo "Pushing $TAGGED_IMAGE"
+# docker push "$TAGGED_IMAGE"
 
 echo "Build and push completed: $LATEST_IMAGE"
-echo "Build and push completed: $TAGGED_IMAGE"
+# echo "Build and push completed: $TAGGED_IMAGE"

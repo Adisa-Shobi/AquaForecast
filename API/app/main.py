@@ -1,12 +1,19 @@
 """Main FastAPI application."""
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 import time
+
+# Configure TensorFlow resource limits BEFORE any imports
+# This prevents TF from monopolizing CPU during training
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Reduce TF logging
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Disable oneDNN optimizations for consistency
+# Note: Thread limits are also set in training task for redundancy
 
 from app.core.config import settings
 from app.core.database import engine, Base
@@ -48,7 +55,11 @@ async def lifespan(app: FastAPI):
         raise
 
     # Run startup tasks (baseline model initialization, etc.)
-    run_startup_tasks()
+    try:
+        run_startup_tasks()
+    except Exception as e:
+        logger.error(f"Failed to run startup tasks: {e}")
+        # Don't raise - allow API to start even if startup tasks fail
 
     yield
 
@@ -56,74 +67,36 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down AquaForecast API...")
 
 
-# Create FastAPI application
+# Create FastAPI app
 app = FastAPI(
-    title=settings.PROJECT_NAME,
+    title="AquaForecast API",
+    description="Backend API for AquaForecast aquaculture management and prediction system",
     version=settings.VERSION,
-    description="""
-    Privacy-first REST API for aquaculture water quality data collection and analytics.
-    """,
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
 )
 
-# Add CORS middleware
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=["*"],  # Configure appropriately for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-# Request logging middleware
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    """Log all incoming requests."""
-    start_time = time.time()
-
-    # Process request
-    response = await call_next(request)
-
-    # Calculate duration
-    duration = time.time() - start_time
-
-    # Log request
-    logger.info(
-        f"{request.method} {request.url.path} "
-        f"completed in {duration:.3f}s with status {response.status_code}"
-    )
-
-    return response
-
 
 # Register exception handlers
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(SQLAlchemyError, database_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
-# Include API v1 router
-app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+# Include API router
+app.include_router(api_router, prefix="/api/v1")
 
 
 # Health check endpoint
-@app.get(
-    "/health",
-    response_model=HealthResponse,
-    tags=["Health"],
-    summary="Health check",
-    description="Check if the API is running and healthy",
-)
-def health_check() -> HealthResponse:
-    """
-    Health check endpoint.
-
-    Returns:
-        API health status, version, and environment
-    """
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint."""
     return HealthResponse(
         status="healthy",
         version=settings.VERSION,
@@ -131,34 +104,12 @@ def health_check() -> HealthResponse:
     )
 
 
-# Root endpoint
-@app.get(
-    "/",
-    tags=["Root"],
-    summary="API root",
-    description="Root endpoint with API information",
-)
-def read_root():
-    """
-    Root endpoint with API information.
-
-    Returns:
-        Welcome message and links
-    """
-    return {
-        "message": "Welcome to AquaForecast API",
-        "version": settings.VERSION,
-        "docs": "/docs",
-        "health": "/health",
-    }
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "app.main:app",
-        host=settings.HOST,
-        port=settings.PORT,
-        reload=settings.ENVIRONMENT == "development",
-    )
+# Request timing middleware
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    """Add response time header to all requests."""
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    return response
