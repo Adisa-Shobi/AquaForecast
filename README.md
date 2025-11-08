@@ -74,7 +74,7 @@ See [client/CLAUDE.md](./client/CLAUDE.md) for build instructions and architectu
 
 ### API Load Test
 
-[Test Results](./report_1762612863.776761.html)
+[Test Results](./Locust.pdf)
 
 ## Analysis
 
