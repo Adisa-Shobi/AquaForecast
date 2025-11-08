@@ -71,3 +71,7 @@ alembic/versions/*.pyc
 
 # Deployment guide
 DROPLET_DEPLOYMENT.md
+
+# Locust load testing
+load_test_report.html
+locust.log
