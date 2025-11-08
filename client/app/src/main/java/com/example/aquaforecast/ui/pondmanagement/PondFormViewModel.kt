@@ -110,9 +110,8 @@ class PondFormViewModel(
             _state.update { it.copy(isSaving = true, error = null) }
 
             val species = when (currentState.species) {
-                "CATFISH", "Catfish" -> Species.CATFISH
-                "TILAPIA", "Tilapia" -> Species.TILAPIA
-                else -> Species.CATFISH // Default
+                "CATFISH", "Catfish", "African Catfish" -> Species.CATFISH
+                else -> Species.CATFISH // Default to African Catfish
             }
 
             val pond = Pond(
