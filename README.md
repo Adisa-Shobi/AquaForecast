@@ -1,6 +1,7 @@
 # Aquaculture Yield Prediction Model
 
 [Demo](https://drive.google.com/file/d/1WwGOkcnD11hzn2CXYk6t4v1SyZDDyaSC/view?usp=sharing)
+[Dashboard](https://aqua-forecast-lovat.vercel.app/)
 
 ## Description
 
