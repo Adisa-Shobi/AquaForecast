@@ -213,7 +213,7 @@ class DatabaseBootstrapper(
             FeedingScheduleEntity(
                 name = "Morning Feed - Pond A",
                 pondId = 1,
-                pondName = "Pond A - Tilapia",
+                pondName = "Pond A - Catfish",
                 startDate = currentTime - TimeUnit.DAYS.toMillis(30),
                 endDate = currentTime + TimeUnit.DAYS.toMillis(30),
                 feedingTime = "08:00",
@@ -223,7 +223,7 @@ class DatabaseBootstrapper(
             FeedingScheduleEntity(
                 name = "Evening Feed - Pond A",
                 pondId = 1,
-                pondName = "Pond A - Tilapia",
+                pondName = "Pond A - Catfish",
                 startDate = currentTime - TimeUnit.DAYS.toMillis(30),
                 endDate = currentTime + TimeUnit.DAYS.toMillis(30),
                 feedingTime = "18:00",
@@ -253,7 +253,7 @@ class DatabaseBootstrapper(
             FeedingScheduleEntity(
                 name = "Morning Feed - Pond C",
                 pondId = 3,
-                pondName = "Pond C - Tilapia",
+                pondName = "Pond C - Catfish",
                 startDate = currentTime - TimeUnit.DAYS.toMillis(20),
                 endDate = currentTime + TimeUnit.DAYS.toMillis(40),
                 feedingTime = "08:30",
@@ -263,7 +263,7 @@ class DatabaseBootstrapper(
             FeedingScheduleEntity(
                 name = "Evening Feed - Pond C",
                 pondId = 3,
-                pondName = "Pond C - Tilapia",
+                pondName = "Pond C - Catfish",
                 startDate = currentTime - TimeUnit.DAYS.toMillis(20),
                 endDate = currentTime + TimeUnit.DAYS.toMillis(40),
                 feedingTime = "17:30",

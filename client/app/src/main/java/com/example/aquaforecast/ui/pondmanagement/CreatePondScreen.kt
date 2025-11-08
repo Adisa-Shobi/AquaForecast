@@ -109,16 +109,9 @@ fun CreatePondScreen(
                         }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Catfish") },
+                            text = { Text("African Catfish") },
                             onClick = {
                                 viewModel.onSpeciesChanged("CATFISH")
-                                viewModel.dismissSpeciesDropdown()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Tilapia") },
-                            onClick = {
-                                viewModel.onSpeciesChanged("TILAPIA")
                                 viewModel.dismissSpeciesDropdown()
                             }
                         )

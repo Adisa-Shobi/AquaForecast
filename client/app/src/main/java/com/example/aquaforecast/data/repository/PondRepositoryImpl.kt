@@ -74,9 +74,8 @@ class PondRepositoryImpl(
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val speciesEnum = when (species) {
-                "Tilapia" -> Species.TILAPIA
-                "Catfish" -> Species.CATFISH
-                else -> throw IllegalArgumentException("Invalid species: $species")
+                "Catfish", "African Catfish" -> Species.CATFISH
+                else -> Species.CATFISH // Default to African Catfish
             }
 
             val existingPond = pondDao.getPond()

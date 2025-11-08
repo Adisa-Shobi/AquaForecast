@@ -28,10 +28,7 @@ data class Pond(
     }
 
     fun getExpectedHarvestDate(): LocalDate {
-        val growthPeriodDays = when (species) {
-            Species.TILAPIA -> 180L
-            Species.CATFISH -> 150L
-        }
+        val growthPeriodDays = 150L // African Catfish growth period
         return startDate.plusDays(growthPeriodDays)
     }
 
@@ -45,15 +42,13 @@ data class Pond(
 
 @Serializable
 enum class Species(val displayName: String, val scientificName: String) {
-    TILAPIA("Tilapia", "Oreochromis niloticus"),
-    CATFISH("Catfish", "Clarias gariepinus");
+    CATFISH("African Catfish", "Clarias gariepinus");
 
     companion object {
         fun fromString(value: String): Species {
             return when (value.uppercase()) {
-                "TILAPIA" -> TILAPIA
                 "CATFISH" -> CATFISH
-                else -> throw IllegalArgumentException("Unknown species: $value")
+                else -> CATFISH // Default to African Catfish
             }
         }
 
