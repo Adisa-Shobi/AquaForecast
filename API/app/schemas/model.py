@@ -71,7 +71,7 @@ class RetrainRequest(BaseModel):
     notes: Optional[str] = Field(None, description="Training notes or release notes")
     epochs: Optional[int] = Field(100, description="Number of training epochs", ge=1, le=500)
     batch_size: Optional[int] = Field(32, description="Training batch size", ge=8, le=256)
-    learning_rate: Optional[float] = Field(0.000006, description="Learning rate", gt=0, lt=1)
+    learning_rate: Optional[float] = Field(0.001, description="Learning rate for transfer learning (higher rate needed when data distribution changes)", gt=0, lt=1)
 
 
 class DeployModelRequest(BaseModel):
@@ -106,3 +106,16 @@ class TrainingStatusResponse(BaseModel):
     current_epoch: Optional[int] = None
     total_epochs: Optional[int] = None
     message: Optional[str] = None
+
+
+class DeleteModelResponse(BaseModel):
+    """Delete model response."""
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_id: str
+    version: str
+    deleted_training_sessions: int
+    deleted_training_tasks: int
+    storage_files_deleted: List[str]
+    storage_errors: Optional[List[str]] = None
+    message: str

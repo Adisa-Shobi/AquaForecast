@@ -104,3 +104,13 @@ export interface RetrainResponse {
   base_model_version: string | null;
   estimated_duration_minutes: number;
 }
+
+export interface DeleteModelResponse {
+  model_id: string;
+  version: string;
+  deleted_training_sessions: number;
+  deleted_training_tasks: number;
+  storage_files_deleted: string[];
+  storage_errors: string[] | null;
+  message: string;
+}

@@ -22,6 +22,7 @@ wheels/
 
 # Model
 base_model/
+temp_models/
 
 # Virtual Environment
 venv/

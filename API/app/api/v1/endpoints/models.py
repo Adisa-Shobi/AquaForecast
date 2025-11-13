@@ -19,6 +19,7 @@ from app.schemas.model import (
     ModelMetricsResponse,
     TrainingStatusResponse,
     ModelStatusEnum,
+    DeleteModelResponse,
 )
 from app.schemas.common import SuccessResponse
 from app.services.model_service import ModelService
@@ -618,6 +619,64 @@ def archive_model(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
+        )
+
+
+@router.delete(
+    "/{model_id}",
+    response_model=SuccessResponse,
+    summary="Delete model",
+    description="Permanently delete a model, its training sessions, and cloud storage files. Cannot delete deployed models.",
+)
+def delete_model(
+    model_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    delete_storage: bool = Query(True, description="Delete files from cloud storage"),
+) -> SuccessResponse:
+    """
+    Delete a model permanently.
+
+    This will:
+    - Delete the model version record from database
+    - Delete all associated training sessions (CASCADE)
+    - Delete training tasks that resulted in this model
+    - Delete model files from cloud storage (TFLite, Keras, scaler)
+
+    WARNING: This action cannot be undone!
+    """
+    try:
+        result = ModelService.delete_model(
+            db=db,
+            model_id=model_id,
+            delete_from_storage=delete_storage
+        )
+
+        response_data = DeleteModelResponse(
+            model_id=result['model_id'],
+            version=result['version'],
+            deleted_training_sessions=result['deleted_training_sessions'],
+            deleted_training_tasks=result['deleted_training_tasks'],
+            storage_files_deleted=result['storage_files_deleted'],
+            storage_errors=result['storage_errors'],
+            message=f"Model {result['version']} deleted successfully"
+        )
+
+        return SuccessResponse(
+            success=True,
+            data=response_data.model_dump(),
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Failed to delete model {model_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete model: {str(e)}",
         )
 
 
