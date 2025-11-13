@@ -9,6 +9,7 @@ import type {
   RetrainResponse,
   TrainingTask,
   TrainingTaskListResponse,
+  DeleteModelResponse,
 } from '../types/model';
 import { auth } from '../config/firebase';
 
@@ -99,6 +100,14 @@ export const modelApi = {
   // Archive model
   async archiveModel(modelId: string): Promise<any> {
     const { data } = await apiClient.delete<ApiResponse<any>>(`/models/${modelId}/archive`);
+    return data.data;
+  },
+
+  // Delete model permanently
+  async deleteModel(modelId: string, deleteStorage: boolean = true): Promise<DeleteModelResponse> {
+    const { data } = await apiClient.delete<ApiResponse<DeleteModelResponse>>(
+      `/models/${modelId}?delete_storage=${deleteStorage}`
+    );
     return data.data;
   },
 };

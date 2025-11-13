@@ -1,11 +1,13 @@
 """ML model service - model version management."""
 
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.models.model_version import ModelVersion, ModelStatus
+from app.models.training_task import TrainingTask
+from app.core.cloudinary_storage import cloudinary_storage
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +250,109 @@ class ModelService:
 
         # Simple comparison (in production, use proper version comparison)
         return app_version >= model.min_app_version
+
+    @staticmethod
+    def delete_model(db: Session, model_id: str, delete_from_storage: bool = True) -> Dict[str, Any]:
+        """
+        Delete a model and all its related data.
+
+        This will delete:
+        - The model version record
+        - All training sessions (CASCADE)
+        - Related training tasks that resulted in this model
+        - Cloud storage files (TFLite, Keras, scaler)
+
+        Args:
+            db: Database session
+            model_id: ID of model to delete
+            delete_from_storage: Whether to delete files from cloud storage (default True)
+
+        Returns:
+            Dict with deletion summary
+
+        Raises:
+            ValueError: If model not found or is currently deployed
+        """
+        model = ModelService.get_model_by_id(db, model_id)
+        if not model:
+            raise ValueError(f"Model {model_id} not found")
+
+        if model.is_deployed:
+            raise ValueError(
+                f"Cannot delete deployed model {model.version}. "
+                "Please undeploy it first."
+            )
+
+        # Collect info for summary
+        version = model.version
+        training_sessions_count = len(model.training_sessions) if model.training_sessions else 0
+
+        # Delete training tasks that resulted in this model
+        training_tasks = db.query(TrainingTask).filter(
+            TrainingTask.result_model_id == model_id
+        ).all()
+        training_tasks_count = len(training_tasks)
+
+        for task in training_tasks:
+            db.delete(task)
+            logger.info(f"Deleted training task {task.id} for model {model_id}")
+
+        # Delete from cloud storage
+        storage_deleted = []
+        storage_errors = []
+
+        if delete_from_storage:
+            # Delete TFLite model
+            if model.tflite_cloudinary_id:
+                try:
+                    cloudinary_storage.delete_model(model.tflite_cloudinary_id)
+                    storage_deleted.append(f"tflite: {model.tflite_cloudinary_id}")
+                    logger.info(f"Deleted TFLite model from storage: {model.tflite_cloudinary_id}")
+                except Exception as e:
+                    error_msg = f"tflite: {str(e)}"
+                    storage_errors.append(error_msg)
+                    logger.error(f"Failed to delete TFLite model: {e}")
+
+            # Delete Keras model
+            if model.keras_cloudinary_id:
+                try:
+                    cloudinary_storage.delete_model(model.keras_cloudinary_id)
+                    storage_deleted.append(f"keras: {model.keras_cloudinary_id}")
+                    logger.info(f"Deleted Keras model from storage: {model.keras_cloudinary_id}")
+                except Exception as e:
+                    error_msg = f"keras: {str(e)}"
+                    storage_errors.append(error_msg)
+                    logger.error(f"Failed to delete Keras model: {e}")
+
+            # Delete scaler if it exists in preprocessing_config
+            if model.preprocessing_config and 'scaler_cloudinary_id' in model.preprocessing_config:
+                scaler_id = model.preprocessing_config['scaler_cloudinary_id']
+                try:
+                    cloudinary_storage.delete_model(scaler_id)
+                    storage_deleted.append(f"scaler: {scaler_id}")
+                    logger.info(f"Deleted scaler from storage: {scaler_id}")
+                except Exception as e:
+                    error_msg = f"scaler: {str(e)}"
+                    storage_errors.append(error_msg)
+                    logger.error(f"Failed to delete scaler: {e}")
+
+        # Delete the model (CASCADE will handle training_sessions)
+        db.delete(model)
+        db.commit()
+
+        logger.info(
+            f"Deleted model {model_id} (v{version}) with {training_sessions_count} sessions "
+            f"and {training_tasks_count} tasks"
+        )
+
+        return {
+            'model_id': model_id,
+            'version': version,
+            'deleted_training_sessions': training_sessions_count,
+            'deleted_training_tasks': training_tasks_count,
+            'storage_files_deleted': storage_deleted,
+            'storage_errors': storage_errors if storage_errors else None,
+        }
 
     @staticmethod
     def get_model_metrics(db: Session, model_id: str) -> dict:

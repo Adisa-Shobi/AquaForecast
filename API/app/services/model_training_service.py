@@ -5,7 +5,7 @@ import time
 import tempfile
 import json
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
 import uuid
@@ -49,10 +49,10 @@ class ModelTrainingService:
             'training': {
                 'epochs': 100,
                 'batch_size': 32,
-                'early_stop_patience': 5,
-                'reduce_lr_patience': 2,
-                'reduce_lr_factor': 0.7,
-                'min_lr': 1e-6
+                'early_stop_patience': 15,  # Increased for transfer learning with new data distribution
+                'reduce_lr_patience': 5,    # Increased to give model more time to adapt
+                'reduce_lr_factor': 0.5,    # More aggressive LR reduction
+                'min_lr': 1e-7
             }
         },
         'preprocessing': {
@@ -131,7 +131,8 @@ class ModelTrainingService:
                 'ammonia': float(record.ammonia),
                 'nitrate': float(record.nitrate),
                 'turbidity': float(record.turbidity),
-                'fish_weight': float(record.fish_weight) if record.fish_weight else None,
+                # CRITICAL: Database stores weight in KG, but model expects GRAMS
+                'fish_weight': float(record.fish_weight) * 1000.0 if record.fish_weight else None,
                 'fish_length': float(record.fish_length) if record.fish_length else None,
                 'recorded_at': record.recorded_at,
                 'start_date': record.start_date,
@@ -389,6 +390,149 @@ class ModelTrainingService:
         return model
 
     @staticmethod
+    def _prepare_model(
+        base_model: Optional[ModelVersion],
+        input_dim: int,
+        learning_rate: float,
+        model_config: Dict
+    ) -> models.Sequential:
+        """
+        Prepare model for training (load existing or create new).
+
+        Args:
+            base_model: Base model for transfer learning (None for new model)
+            input_dim: Number of input features
+            learning_rate: Learning rate for optimizer
+            model_config: Model configuration dict
+
+        Returns:
+            Compiled Keras model
+        """
+        if base_model:
+            # Load and recompile for transfer learning
+            model = ModelTrainingService.load_base_model(base_model)
+            model.compile(
+                optimizer=Adam(learning_rate=learning_rate),
+                loss='mse',
+                metrics=['mae']
+            )
+        else:
+            # Create new model from scratch
+            model = ModelTrainingService.create_model(
+                input_dim=input_dim,
+                config=model_config
+            )
+
+        return model
+
+    @staticmethod
+    def _train_with_callbacks(
+        model: models.Sequential,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+        epochs: int,
+        batch_size: int,
+        update_progress
+    ):
+        """
+        Train model with standard callbacks.
+
+        Args:
+            model: Compiled Keras model
+            X_train: Training features
+            y_train: Training targets
+            X_val: Validation features
+            y_val: Validation targets
+            epochs: Number of epochs
+            batch_size: Batch size
+            update_progress: Progress update function
+
+        Returns:
+            Training history
+        """
+        training_config = ModelTrainingService.DEFAULT_CONFIG['model_params']['training']
+
+        # Setup callbacks
+        early_stop = callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=training_config['early_stop_patience'],
+            restore_best_weights=True
+        )
+        reduce_lr = callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=training_config['reduce_lr_factor'],
+            patience=training_config['reduce_lr_patience'],
+            min_lr=training_config['min_lr']
+        )
+
+        # Progress tracking callback
+        class ProgressCallback(callbacks.Callback):
+            def on_epoch_end(self, epoch, logs=None):
+                progress = 30.0 + (epoch + 1) / epochs * 50.0
+                update_progress(f"Training epoch {epoch + 1}/{epochs}", progress, epoch + 1)
+
+        # Train model
+        return model.fit(
+            X_train, y_train,
+            validation_data=(X_val, y_val),
+            epochs=epochs,
+            batch_size=batch_size,
+            callbacks=[early_stop, reduce_lr, ProgressCallback()],
+            verbose=1
+        )
+
+    @staticmethod
+    def _evaluate_model(
+        model: models.Sequential,
+        X_test: np.ndarray,
+        y_test: np.ndarray,
+        history,
+        epochs: int
+    ) -> Dict[str, Any]:
+        """
+        Evaluate model and compute metrics.
+
+        Args:
+            model: Trained model
+            X_test: Test features
+            y_test: Test targets
+            history: Training history
+            epochs: Requested epochs
+
+        Returns:
+            Dictionary with training and evaluation metrics
+        """
+        # Make predictions
+        test_pred = model.predict(X_test)
+
+        # Calculate metrics
+        r2 = r2_score(y_test, test_pred)
+        rmse = np.sqrt(mean_squared_error(y_test, test_pred))
+        mae = mean_absolute_error(y_test, test_pred)
+
+        # Training summary
+        actual_epochs = len(history.history['loss'])
+        early_stopped = actual_epochs < epochs
+
+        return {
+            'overall': {
+                'r2': float(r2),
+                'rmse': float(rmse),
+                'mae': float(mae)
+            },
+            'training': {
+                'early_stopped': early_stopped,
+                'requested_epochs': epochs,
+                'actual_epochs': actual_epochs,
+                'best_val_loss': float(min(history.history['val_loss'])),
+                'final_train_loss': float(history.history['loss'][-1]),
+                'final_val_loss': float(history.history['val_loss'][-1]),
+            }
+        }
+
+    @staticmethod
     def convert_to_tflite(model: models.Sequential, save_path: str) -> int:
         """
         Convert Keras model to TFLite format.
@@ -534,108 +678,63 @@ class ModelTrainingService:
             X_temp, y_temp, test_size=val_size, random_state=config['random_state']
         )
 
-        # Scale features - ALWAYS use the same scaler from local file
-        scaler_path = "app/ml_models/default/default_scaler.pkl"
-        if not os.path.exists(scaler_path):
-            raise ValueError(
-                f"Default scaler not found at {scaler_path}. "
-                "Please place default_scaler.pkl from notebook training."
-            )
+        # Scale features using RobustScaler fit on new training data
+        update_progress("Scaling features", 22.0)
+        scaler = RobustScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_val_scaled = scaler.transform(X_val)
+        X_test_scaled = scaler.transform(X_test)
 
-        scaler = joblib.load(scaler_path)
-        X_train_scaled = scaler.fit_transform(X_train)  # transform only, never fit
-        X_val_scaled = scaler.fit_transform(X_val)
-        X_test_scaled = scaler.fit_transform(X_test)
+        logger.info(f"Data scaled - Features: {X_train_scaled.shape}, "
+                   f"Targets: weight(mean={y_train[:, 0].mean():.1f}g, std={y_train[:, 0].std():.1f}g), "
+                   f"length(mean={y_train[:, 1].mean():.1f}cm, std={y_train[:, 1].std():.1f}cm)")
 
         # Load or create model
         model_config = ModelTrainingService.DEFAULT_CONFIG['model_params']['nn'].copy()
         model_config['learning_rate'] = learning_rate
 
+        # Prepare model (load for transfer learning or create new)
+        update_progress("Preparing model", 25.0)
+        model = ModelTrainingService._prepare_model(
+            base_model=base_model,
+            input_dim=X_train_scaled.shape[1],
+            learning_rate=learning_rate,
+            model_config=model_config
+        )
+
         if base_model:
-            # Load existing model from baseline for retraining
-            update_progress("Loading base model", 25.0)
-            model = ModelTrainingService.load_base_model(base_model)
-
-            # Update learning rate if specified
-            if learning_rate != ModelTrainingService.DEFAULT_CONFIG['model_params']['nn']['learning_rate']:
-                logger.info(f"Updating learning rate from default to {learning_rate}")
-                model.compile(
-                    optimizer=Adam(learning_rate=learning_rate),
-                    loss='mse',
-                    metrics=['mae']
-                )
-
-            logger.info(f"Loaded base model {base_model.version} for retraining")
+            logger.info(f"Transfer learning from {base_model.version} (lr={learning_rate})")
             model_config['loaded_from'] = base_model.version
         else:
-            # Create new model from scratch (initial training)
-            update_progress("Building model architecture", 25.0)
-
-            model = ModelTrainingService.create_model(
-                input_dim=X_train_scaled.shape[1],
-                config=model_config
-            )
-
-            logger.info("Created new model from scratch for initial training")
+            logger.info(f"Training new model from scratch (lr={learning_rate})")
             model_config['loaded_from'] = None
 
-        # Training callbacks
+        # Train model with callbacks
         update_progress("Training model", 30.0)
-        training_config = ModelTrainingService.DEFAULT_CONFIG['model_params']['training']
-        early_stop = callbacks.EarlyStopping(
-            monitor='val_loss',
-            patience=training_config['early_stop_patience'],
-            restore_best_weights=True
-        )
-        reduce_lr = callbacks.ReduceLROnPlateau(
-            monitor='val_loss',
-            factor=training_config['reduce_lr_factor'],
-            patience=training_config['reduce_lr_patience'],
-            min_lr=training_config['min_lr']
-        )
-
-        # Custom callback for progress tracking
-        class ProgressCallback(callbacks.Callback):
-            def on_epoch_end(self, epoch, logs=None):
-                progress = 30.0 + (epoch + 1) / epochs * 50.0
-                update_progress(f"Training epoch {epoch + 1}/{epochs}", progress, epoch + 1)
-
-        progress_callback = ProgressCallback()
-
-        # Train model
-        history = model.fit(
-            X_train_scaled, y_train,
-            validation_data=(X_val_scaled, y_val),
+        history = ModelTrainingService._train_with_callbacks(
+            model=model,
+            X_train=X_train_scaled,
+            y_train=y_train,
+            X_val=X_val_scaled,
+            y_val=y_val,
             epochs=epochs,
             batch_size=batch_size,
-            callbacks=[early_stop, reduce_lr, progress_callback],
-            verbose=1
+            update_progress=update_progress
         )
 
-        # Check if early stopping was triggered
-        actual_epochs = len(history.history['loss'])
-        early_stopped = actual_epochs < epochs
-        if early_stopped:
-            logger.info(f"Early stopping triggered at epoch {actual_epochs}/{epochs}")
-
-        # Evaluate on test set
+        # Evaluate model and compute metrics
         update_progress("Evaluating model", 82.0)
-        test_pred = model.predict(X_test_scaled)
-        r2 = r2_score(y_test, test_pred)
-        rmse = np.sqrt(mean_squared_error(y_test, test_pred))
-        mae = mean_absolute_error(y_test, test_pred)
+        metrics = ModelTrainingService._evaluate_model(
+            model=model,
+            X_test=X_test_scaled,
+            y_test=y_test,
+            history=history,
+            epochs=epochs
+        )
 
-        metrics = {
-            'overall': {'r2': float(r2), 'rmse': float(rmse), 'mae': float(mae)},
-            'training': {
-                'early_stopped': early_stopped,
-                'requested_epochs': epochs,
-                'actual_epochs': actual_epochs,
-                'best_val_loss': float(min(history.history['val_loss'])),
-                'final_train_loss': float(history.history['loss'][-1]),
-                'final_val_loss': float(history.history['val_loss'][-1]),
-            }
-        }
+        logger.info(f"Training complete: {metrics['training']['actual_epochs']} epochs, "
+                   f"R²={metrics['overall']['r2']:.4f}, RMSE={metrics['overall']['rmse']:.1f}, "
+                   f"MAE={metrics['overall']['mae']:.1f}")
 
         # Create temporary directory for model files
         update_progress("Converting and saving models", 85.0)
@@ -721,9 +820,9 @@ class ModelTrainingService:
                 'val_loss': [float(x) for x in history.history['val_loss']],
                 'mae': [float(x) for x in history.history['mae']],
                 'val_mae': [float(x) for x in history.history['val_mae']],
-                'early_stopped': early_stopped,
-                'requested_epochs': epochs,
-                'actual_epochs': actual_epochs,
+                'early_stopped': metrics['training']['early_stopped'],
+                'requested_epochs': metrics['training']['requested_epochs'],
+                'actual_epochs': metrics['training']['actual_epochs'],
             },
             started_at=datetime.utcfromtimestamp(start_time),
             completed_at=datetime.utcnow(),

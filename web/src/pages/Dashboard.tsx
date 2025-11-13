@@ -10,7 +10,8 @@ import {
   Rocket,
   TrendingUp,
   Database,
-  Calendar
+  Calendar,
+  Trash2
 } from 'lucide-react';
 import { formatDistance } from 'date-fns';
 import TrainingProgress from '../components/TrainingProgress';
@@ -36,6 +37,9 @@ export default function Dashboard() {
   const [deployedModelId, setDeployedModelId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [modelToDelete, setModelToDelete] = useState<ModelVersion | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -89,6 +93,35 @@ export default function Dashboard() {
     const remainingSeconds = seconds % 60;
     return `${minutes}m ${remainingSeconds}s`;
   };
+
+  const handleDeleteClick = (model: ModelVersion) => {
+    setModelToDelete(model);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!modelToDelete) return;
+
+    try {
+      setDeleting(true);
+      await modelApi.deleteModel(modelToDelete.model_id, true);
+      setDeleteDialogOpen(false);
+      setModelToDelete(null);
+      await loadModels(); // Refresh the list
+      alert(`Model ${modelToDelete.version} deleted successfully`);
+    } catch (error: any) {
+      console.error('Failed to delete model:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to delete model';
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setModelToDelete(null);
+  };;
 
   if (loading) {
     return (
@@ -276,6 +309,15 @@ export default function Dashboard() {
                         Deploy
                       </button>
                     )}
+                    {!model.is_deployed && (
+                      <button
+                        onClick={() => handleDeleteClick(model)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete model"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               );
@@ -289,6 +331,65 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteDialogOpen && modelToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="text-red-600" size={20} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Delete Model</h3>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-700 mb-2">
+                Are you sure you want to delete model <strong>{modelToDelete.version}</strong>?
+              </p>
+              <p className="text-sm text-gray-600 mb-3">
+                This will permanently delete:
+              </p>
+              <ul className="text-sm text-gray-600 space-y-1 ml-4">
+                <li>• Model files (TFLite, Keras)</li>
+                <li>• All training sessions</li>
+                <li>• Training tasks for this model</li>
+                <li>• Cloud storage files</li>
+              </ul>
+              <p className="text-sm text-red-600 font-medium mt-3">
+                WARNING: This action cannot be undone!
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteCancel}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Delete
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
